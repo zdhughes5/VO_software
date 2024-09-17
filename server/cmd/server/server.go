@@ -21,74 +21,6 @@ import (
 var extractEventNumber = parseDWord0
 var dataSaveDir string = "/home/zdhughes/optical_data/"
 
-func parseWordUint32(event []byte, i int, j int, littleEndian bool) uint32 {
-
-	if littleEndian {
-		dataWord := binary.LittleEndian.Uint32(event[i:j])
-		return dataWord
-	} else {
-		dataWord := binary.BigEndian.Uint32(event[i:j])
-		return dataWord
-	}
-
-}
-
-func parseDWord0(event []byte, littleEndian bool) uint32 {
-	return parseWordUint32(event, 0, 4, littleEndian)
-}
-
-// Convert a 32-bit word to a decimal number with 16 integer bits and 16 fractional bits
-func convertToDecimal(word uint32) float64 {
-	// Extract the integer part (first 16 bits)
-	integerPart := uint16(word >> 16)
-
-	// Extract the fractional part (last 16 bits)
-	fractionalPart := word & 0xFFFF
-
-	// Convert the fractional part to decimal
-	fractionalDecimal := 0.0
-	for i := 0; i < 16; i++ {
-		if fractionalPart&(1<<uint(15-i)) != 0 {
-			fractionalDecimal += math.Pow(2, float64(-1-i))
-		}
-	}
-
-	// Combine the integer and fractional parts
-	return float64(integerPart) + fractionalDecimal
-}
-
-// Convert a byte array of length 280 to an array of 70 decimal values
-func convertByteArrayToDecimals(data []byte) []float64 {
-	if len(data) != 280 {
-		panic("Input byte array must be of length 280")
-	}
-
-	decimals := make([]float64, 70)
-	for i := 0; i < 70; i++ {
-		// Extract the 32-bit word from the byte array
-		word := binary.BigEndian.Uint32(data[i*4 : (i+1)*4])
-		// Convert the 32-bit word to a decimal value
-		decimals[i] = convertToDecimal(word)
-	}
-
-	return decimals
-}
-
-// Extract relevant pixel values from a padded array to a new array of 500 pixels
-func extractRelevantPixels(pixelValuesPadded [560]float64) [500]float64 {
-	if len(pixelValuesPadded) != 560 {
-		panic("Input pixel array must be of length 560")
-	}
-
-	pixelValues := [500]float64{}
-	copy(pixelValues[0:130], pixelValuesPadded[0:130])
-	copy(pixelValues[130:250], pixelValuesPadded[140:260])
-	copy(pixelValues[250:380], pixelValuesPadded[280:410])
-	copy(pixelValues[380:500], pixelValuesPadded[420:540])
-
-	return pixelValues
-}
-
 type ctrlCmd uint32
 
 type harvesterID struct {
@@ -117,80 +49,13 @@ const (
 	// Add more enum values here
 )
 
-// Function to get the IP address of a specific telescope and harvester position
-func getHarvesterIP(telescopeNumber int, harvesterPosition int) (string, error) {
-	for _, telescope := range globalState.Telescopes {
-		if telescope.Telescope == telescopeNumber {
-			for _, harvester := range telescope.Harvesters {
-				if harvester.TelescopePosition == harvesterPosition {
-					return harvester.IP, nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("harvester with telescope position %d not found in telescope %d", harvesterPosition, telescopeNumber)
-}
-
 // To send and event to the GUI we need:
 // 8 UDP packets of the same event from 1 telescope.
 // func extractBlockNumber()
 // func extractEventNumber()
 
-// Define the struct to hold the state of each harvester, including its IP address, channel, and pixel index
-type HarvesterState struct {
-	ArrayPosition     int    `json:"arrayPosition"`
-	TelescopePosition int    `json:"telescopePosition"`
-	Missing           bool   `json:"missing"`
-	IP                string `json:"ip"`
-	Channel           [2]int `json:"channel"`
-	PixelIndex        [2]int `json:"pixelIndex"`
-}
-
-// Define the struct to hold the state of each telescope, including its number and harvesters
-type TelescopeState struct {
-	Telescope  int              `json:"telescope"`
-	Missing    bool             `json:"missing"`
-	Harvesters []HarvesterState `json:"harvesters"`
-}
-
-// Define the struct to hold the state of the entire system, including its telescopes
-type SystemState struct {
-	Telescopes []TelescopeState `json:"telescopes"`
-}
-
 // Declare the global variable
 var globalState SystemState
-
-// Function to load the state from a JSON file
-func loadStateFromFile(filename string) error {
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	bytes, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(bytes, &globalState)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Function to print the state for debugging
-func printState() {
-	for i, telescope := range globalState.Telescopes {
-		fmt.Printf("Telescope %d: Telescope=%d, Missing=%v\n", i+1, telescope.Telescope, telescope.Missing)
-		for j, harvester := range telescope.Harvesters {
-			fmt.Printf("  Harvester %d: ArrayPosition=%d, TelescopePosition=%d, Missing=%v, IP=%s, Channel=%v, PixelIndex=%v\n", j+1, harvester.ArrayPosition, harvester.TelescopePosition, harvester.Missing, harvester.IP, harvester.Channel, harvester.PixelIndex)
-		}
-	}
-}
 
 var (
 	//jobIsRunning   bool
@@ -202,21 +67,7 @@ var (
 
 func UNUSED(x ...interface{}) {}
 
-func getTelescopesPresent() []int {
-	var telescopeNumbers []int
-	for _, telescope := range globalState.Telescopes {
-		if !telescope.Missing {
-			telescopeNumbers = append(telescopeNumbers, telescope.Telescope)
-		}
-	}
-	return telescopeNumbers
-}
-
 func main() {
-
-	UNUSED(getHarvesterIP)
-	UNUSED(getMissingTelescopes)
-	UNUSED(getHarvesterPositionFromIP)
 
 	/////////////////// Start Logger //////////
 	logFile, err := os.OpenFile("log.txt", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
@@ -326,38 +177,6 @@ func main() {
 	}
 }
 
-func establishUDPConnection(ipPort string) (*net.UDPConn, error) {
-
-	// Configure UDP listening address
-	udpAddr, err := net.ResolveUDPAddr("udp", ipPort)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create UDP connection
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		return nil, err
-	}
-	return udpConn, nil
-}
-
-func establishUDPConnectionForWrite(ipPort string) (*net.UDPConn, error) {
-
-	// Configure UDP address to write to
-	udpAddr, err := net.ResolveUDPAddr("udp", ipPort)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create UDP connection for writing
-	udpConn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		return nil, err
-	}
-	return udpConn, nil
-}
-
 func resetStart() {
 	runReady = true
 }
@@ -388,60 +207,6 @@ func createRunFile(runNumber string, telescope int) (*os.File, error) {
 		}
 		return outputFile, nil
 	}
-}
-
-func getHarvesterIPArray(telescopeNumber int) ([]string, error) {
-	var ips []string
-	for _, telescope := range globalState.Telescopes {
-		if telescope.Telescope == telescopeNumber {
-			for _, harvester := range telescope.Harvesters {
-				ips = append(ips, harvester.IP)
-			}
-			return ips, nil
-		}
-	}
-	return nil, fmt.Errorf("telescope %d not found", telescopeNumber)
-}
-
-// Function to get the channel array for a given telescope number and telescope position
-func getHarvesterChannel(telescopeNumber int, telescopePosition int) ([2]int, error) {
-	//fmt.Println("globalState.Telescopes %v", globalState.Telescopes)
-	for _, telescope := range globalState.Telescopes {
-		if telescope.Telescope == telescopeNumber {
-			for _, harvester := range telescope.Harvesters {
-				if harvester.TelescopePosition == telescopePosition {
-					return harvester.Channel, nil
-				}
-			}
-		}
-	}
-	return [2]int{}, fmt.Errorf("harvester with telescope position %d not found in telescope %d", telescopePosition, telescopeNumber)
-}
-
-func getTelescopePositionFromIP(ipAddress string) (int, error) {
-	for _, telescope := range globalState.Telescopes {
-		for _, harvester := range telescope.Harvesters {
-			if harvester.IP == ipAddress {
-				return harvester.TelescopePosition, nil
-			}
-		}
-	}
-	return 0, fmt.Errorf("harvester with IP address %s not found", ipAddress)
-}
-
-func getPresentHarvesterIPArray(telescopeNumber int) ([]string, error) {
-	var ips []string
-	for _, telescope := range globalState.Telescopes {
-		if telescope.Telescope == telescopeNumber {
-			for _, harvester := range telescope.Harvesters {
-				if !harvester.Missing {
-					ips = append(ips, harvester.IP)
-				}
-			}
-			return ips, nil
-		}
-	}
-	return nil, fmt.Errorf("telescope %d not found", telescopeNumber)
 }
 
 func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, sendInterval uint32) {
@@ -508,24 +273,6 @@ func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, 
 }
 
 func allTrue(arr []bool) bool {
-	for _, v := range arr {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
-func allHarvesters(arr [8]bool) bool {
-	for _, v := range arr {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
-func allTelescopes(arr [4]bool) bool {
 	for _, v := range arr {
 		if !v {
 			return false
@@ -653,54 +400,6 @@ func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
 
 }*/
 
-func getMissingHarvesters(telescopeNumber int) ([8]bool, error) {
-	for _, telescope := range globalState.Telescopes {
-		if telescope.Telescope == telescopeNumber {
-			missingHarvesters := [8]bool{}
-			for i, harvester := range telescope.Harvesters {
-				missingHarvesters[i] = harvester.Missing
-			}
-			return missingHarvesters, nil
-		}
-	}
-	return [8]bool{}, fmt.Errorf("telescope %d not found", telescopeNumber)
-}
-
-// Function to get a boolean array indicating missing telescopes
-func getMissingTelescopes() ([4]bool, error) {
-	missingTelescopes := [4]bool{}
-	for i, telescope := range globalState.Telescopes {
-		missingTelescopes[i] = telescope.Missing
-	}
-	return missingTelescopes, nil
-}
-
-func getTelescopeSendByteOffset(telescope int) (int, error) {
-	if telescope == 1 {
-		return 0, nil
-	} else if telescope == 2 {
-		return 2000, nil
-	} else if telescope == 3 {
-		return 4000, nil
-	} else if telescope == 4 {
-		return 6000, nil
-	} else {
-		return 0, fmt.Errorf("telescope %d not found", telescope)
-	}
-}
-
-// Function to get the telescopePosition for a given IP address
-func getHarvesterPositionFromIP(ipAddress string) (int, error) {
-	for _, telescope := range globalState.Telescopes {
-		for _, harvester := range telescope.Harvesters {
-			if harvester.IP == ipAddress {
-				return harvester.TelescopePosition, nil
-			}
-		}
-	}
-	return 0, fmt.Errorf("harvester with IP address %s not found", ipAddress)
-}
-
 func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvesterID, outputFile *os.File, startListening <-chan struct{}, stopListening <-chan struct{}, sendInterval uint32, eventBuilderChannel chan<- eventBuilderData) {
 
 	buf := make([]byte, 308)
@@ -734,44 +433,6 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 				n, _, _ := udpHarvesterConn.ReadFromUDP(buf)
 				_, _ = outputFile.Write(buf[:n])
 			}
-		}
-	}
-
-}
-
-// startDataForwarding starts forwarding data from a listening IP address to a forwarding IP address.
-// It listens for incoming UDP packets on the listenIP address and forwards them to the forwardIP address.
-// The function stops forwarding when a signal is received on the stopForwarding channel.
-//
-// Parameters:
-// - listenIP: The IP address to listen for incoming UDP packets.
-// - forwardIP: The IP address to forward the received packets to.
-// - stopForwarding: A channel to receive a signal for stopping the data forwarding.
-func startDataForwarding(listenIP string, forwardIP string, stopForwarding <-chan struct{}) {
-
-	buf := make([]byte, 308)
-
-	udpListenConn, udpErr := establishUDPConnection(listenIP)
-	if udpErr != nil {
-		log.Printf("Got error in establishing listening connection at %v. Error %v:", listenIP, udpErr)
-	}
-	defer udpListenConn.Close()
-
-	udpForwardConn, udpErr := establishUDPConnection(forwardIP)
-	if udpErr != nil {
-		log.Printf(`Got error in establishing forwarding connection at %v. Error %v:`, forwardIP, udpErr)
-	}
-	defer udpForwardConn.Close()
-
-	select {
-	case <-stopForwarding:
-		log.Printf("Stopping data fowarding to %v\n", forwardIP)
-		return
-	default:
-		_, _, _ = udpListenConn.ReadFromUDP(buf)
-		_, err := udpForwardConn.Write(buf)
-		if err != nil {
-			log.Panic("Got error sending packet:", err)
 		}
 	}
 
