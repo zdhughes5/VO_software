@@ -1,0 +1,60 @@
+{
+    "telescopes": [
+        {
+            "telescope": 1,
+            "missing": false,
+            "harvesters": [
+                {"arrayPosition": 0, "telescopePosition": 0, "missing": false, "ip": "127.0.0.1:30001", "channel": [0, 70], "pixelIndex": [0, 70]},
+                {"arrayPosition": 1, "telescopePosition": 1, "missing": true, "ip": "127.0.0.1:30002", "channel": [70, 140], "pixelIndex": [70, 130]},
+                {"arrayPosition": 2, "telescopePosition": 2, "missing": true, "ip": "127.0.0.1:30003", "channel": [140, 210], "pixelIndex": [130, 200]},
+                {"arrayPosition": 3, "telescopePosition": 3, "missing": true, "ip": "127.0.0.1:30004", "channel": [210, 280], "pixelIndex": [200, 250]},
+                {"arrayPosition": 4, "telescopePosition": 4, "missing": true, "ip": "127.0.0.1:30005", "channel": [280, 350], "pixelIndex": [250, 320]},
+                {"arrayPosition": 5, "telescopePosition": 5, "missing": true, "ip": "127.0.0.1:30006", "channel": [350, 420], "pixelIndex": [320, 380]},
+                {"arrayPosition": 6, "telescopePosition": 6, "missing": true, "ip": "127.0.0.1:30007", "channel": [420, 490], "pixelIndex": [380, 440]},
+                {"arrayPosition": 7, "telescopePosition": 7, "missing": true, "ip": "127.0.0.1:30008", "channel": [490, 560], "pixelIndex": [440, 500]}
+            ]
+        },
+        {
+            "telescope": 2,
+            "missing": true,
+            "harvesters": [
+                {"arrayPosition": 8, "telescopePosition": 0, "missing": false, "ip": "127.0.0.1:30009", "channel": [0, 70], "pixelIndex": [0, 70]},
+                {"arrayPosition": 9, "telescopePosition": 1, "missing": false, "ip": "127.0.0.1:30010", "channel": [70, 140], "pixelIndex": [70, 130]},
+                {"arrayPosition": 10, "telescopePosition": 2, "missing": false, "ip": "127.0.0.1:30011", "channel": [140, 210], "pixelIndex": [130, 200]},
+                {"arrayPosition": 11, "telescopePosition": 3, "missing": false, "ip": "127.0.0.1:30012", "channel": [210, 280], "pixelIndex": [200, 250]},
+                {"arrayPosition": 12, "telescopePosition": 4, "missing": false, "ip": "127.0.0.1:30013", "channel": [280, 350], "pixelIndex": [250, 320]},
+                {"arrayPosition": 13, "telescopePosition": 5, "missing": false, "ip": "127.0.0.1:30014", "channel": [350, 420], "pixelIndex": [320, 380]},
+                {"arrayPosition": 14, "telescopePosition": 6, "missing": false, "ip": "127.0.0.1:30015", "channel": [420, 490], "pixelIndex": [380, 440]},
+                {"arrayPosition": 15, "telescopePosition": 7, "missing": false, "ip": "127.0.0.1:30016", "channel": [490, 560], "pixelIndex": [440, 500]}
+            ]
+        },
+        {
+            "telescope": 3,
+            "missing": true,
+            "harvesters": [
+                {"arrayPosition": 16, "telescopePosition": 0, "missing": false, "ip": "127.0.0.1:30017", "channel": [0, 70], "pixelIndex": [0, 70]},
+                {"arrayPosition": 17, "telescopePosition": 1, "missing": false, "ip": "127.0.0.1:30018", "channel": [70, 140], "pixelIndex": [70, 130]},
+                {"arrayPosition": 18, "telescopePosition": 2, "missing": false, "ip": "127.0.0.1:30019", "channel": [140, 210], "pixelIndex": [130, 200]},
+                {"arrayPosition": 19, "telescopePosition": 3, "missing": false, "ip": "127.0.0.1:30020", "channel": [210, 280], "pixelIndex": [200, 250]},
+                {"arrayPosition": 20, "telescopePosition": 4, "missing": false, "ip": "127.0.0.1:30021", "channel": [280, 350], "pixelIndex": [250, 320]},
+                {"arrayPosition": 21, "telescopePosition": 5, "missing": false, "ip": "127.0.0.1:30022", "channel": [350, 420], "pixelIndex": [320, 380]},
+                {"arrayPosition": 22, "telescopePosition": 6, "missing": false, "ip": "127.0.0.1:30023", "channel": [420, 490], "pixelIndex": [380, 440]},
+                {"arrayPosition": 23, "telescopePosition": 7, "missing": false, "ip": "127.0.0.1:30024", "channel": [490, 560], "pixelIndex": [440, 500]}
+            ]
+        },
+        {
+            "telescope": 4,
+            "missing": true,
+            "harvesters": [
+                {"arrayPosition": 24, "telescopePosition": 0, "missing": false, "ip": "127.0.0.1:30025", "channel": [0, 70], "pixelIndex": [0, 70]},
+                {"arrayPosition": 25, "telescopePosition": 1, "missing": false, "ip": "127.0.0.1:30026", "channel": [70, 140], "pixelIndex": [70, 130]},
+                {"arrayPosition": 26, "telescopePosition": 2, "missing": false, "ip": "127.0.0.1:30027", "channel": [140, 210], "pixelIndex": [130, 200]},
+                {"arrayPosition": 27, "telescopePosition": 3, "missing": false, "ip": "127.0.0.1:30028", "channel": [210, 280], "pixelIndex": [200, 250]},
+                {"arrayPosition": 28, "telescopePosition": 4, "missing": false, "ip": "127.0.0.1:30029", "channel": [280, 350], "pixelIndex": [250, 320]},
+                {"arrayPosition": 29, "telescopePosition": 5, "missing": false, "ip": "127.0.0.1:30030", "channel": [350, 420], "pixelIndex": [320, 380]},
+                {"arrayPosition": 30, "telescopePosition": 6, "missing": false, "ip": "127.0.0.1:30031", "channel": [420, 490], "pixelIndex": [380, 440]},
+                {"arrayPosition": 31, "telescopePosition": 7, "missing": false, "ip": "127.0.0.1:30032", "channel": [490, 560], "pixelIndex": [440, 500]}
+            ]
+        }
+    ]
+}
