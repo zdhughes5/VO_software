@@ -14,6 +14,13 @@ env/
 # Ignore log files
 *.log
 server/cmd/server/log.txt
+server/cmd/server/server
+server/cmd/send_command/send_command
+server/bin/*
+fadc/bin/*
+fadc/src/server_unified.c
+fadc/src/clbt1.c
+fadc/testfadc/
 
 # Ignore OS generated files
 .DS_Store
