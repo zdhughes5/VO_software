@@ -19,6 +19,7 @@ import (
 // Change these to test things.
 var (
 	controlConnIP string = "127.0.0.1:31250"
+	configFile    string = "../internal/state.json"
 )
 
 type ctrlCmd uint32
@@ -33,7 +34,7 @@ const (
 
 func main() {
 
-	pGlobalState, _ := state.LoadStateFromFile("../../internal/state.json")
+	pGlobalState, _ := state.LoadStateFromFile(configFile)
 
 	var rootCmd = &cobra.Command{Use: "send_command"}
 
@@ -143,7 +144,7 @@ func requestListen(duration int, runID int, sendInterval int, dataSaveDir string
 	}
 
 	// Read the state.json file
-	stateFileContent, _ := state.GetStateFileContents("../../internal/state.json")
+	stateFileContent, _ := state.GetStateFileContents(configFile)
 
 	// Add the state.json content to the data map
 	dataMap["state"] = string(stateFileContent)

@@ -17,16 +17,16 @@ all: $(SERVER_BIN) $(SEND_COMMAND_BIN)
 
 # Build the server binary
 $(SERVER_BIN): $(SERVER_SRC)
-    @mkdir -p $(BIN_DIR)
-    $(GO) build -o $@ $<
+	@mkdir -p $(BIN_DIR)
+	$(GO) build -o $@ $<
 
 # Build the send_command binary
 $(SEND_COMMAND_BIN): $(SEND_COMMAND_SRC)
-    @mkdir -p $(BIN_DIR)
-    $(GO) build -o $@ $<
+	@mkdir -p $(BIN_DIR)
+	$(GO) build -o $@ $<
 
 # Clean up the binaries
 clean:
-    rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR)
 
 .PHONY: all clean

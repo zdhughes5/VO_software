@@ -21,7 +21,6 @@ import (
 )
 
 var extractEventNumber = data_parsing.ParseDWord0
-var dataSaveDir string = "/home/zdhughes/optical_data/"
 
 type ctrlCmd uint32
 
@@ -58,45 +57,46 @@ const (
 
 // Declare the global variable
 var globalState state.SystemState
-
-var (
-	//jobIsRunning   bool
-	//JobIsrunningMu sync.Mutex
-	runReady      bool   = true
-	controlConnIP string = "127.0.0.1:31250"
-	guiIP         string = "127.0.0.1:31255"
-)
+var runReady bool = true
+var configFileName string = "../internal/server.json"
+var config state.Config
 
 func UNUSED(x ...interface{}) {}
 
 func main() {
 
 	/////////////////// Start Logger //////////
-	logFile, err := os.OpenFile("log.txt", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+
+	logFile, err := os.OpenFile("../log/server.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
 	log.Println("Server started.")
+
 	///////////////////////////////////////////
 
-	////////// Load State /////////////////////
-	// Load the state from the JSON file
-	/*err = loadStateFromFile("state.json")
+	//////////////// Load Config //////////////
+
+	pConfig, err := state.LoadConfig(configFileName)
 	if err != nil {
-		log.Fatalf("Failed to load state: %v", err)
-	}*/
-	//printState()
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	config = *pConfig
+	log.Printf("Loaded config: %+v", config)
+
 	///////////////////////////////////////////
 
 	////////// Establish Connections //////////
+
 	// For receiving commands to this server.
-	udpControlConn, err := netutils.EstablishUDPConnection(controlConnIP)
+	udpControlConn, err := netutils.EstablishUDPConnection(config.ControlConnIP)
 	if err != nil {
 		log.Panic("Got error in establishing control connection:", err)
 	}
 	defer udpControlConn.Close()
+
 	///////////////////////////////////////////
 
 	ctrlBuf := make([]byte, 8000)
@@ -129,7 +129,7 @@ func main() {
 			runNumber := uint64(receivedMap["runNumber"].(float64))
 			runNumberString := strconv.FormatUint(runNumber, 10)
 			sendInterval := uint32(receivedMap["sendInterval"].(float64))
-			dataSaveDir = receivedMap["dataSaveDir"].(string)
+			dataSaveDir := receivedMap["dataSaveDir"].(string)
 			if stateContent, ok := receivedMap["state"].(string); ok {
 				err := json.Unmarshal([]byte(stateContent), &globalState)
 				if err != nil {
@@ -221,7 +221,7 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 		}
 	}
 
-	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(guiIP)
+	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(config.GuiIP)
 	if udpErr != nil {
 		log.Panic("Got error in establishing GUI connection:", udpErr)
 	}
@@ -334,7 +334,7 @@ func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
 		}
 		telescopesPresent[thisTelescope-1] = true
 		if state.AllTelescopes(telescopesPresent) {
-			//fmt.Printf("Sending this data to the GUI: %v\n", thisData)
+			fmt.Printf("Sending this data to the GUI:\n")
 			_, _ = udpGUIConn.Write(outGoingData)
 			telescopesPresent, _ = state.GetTelescopesMissingBool(&globalState)
 			// Drain/flush/clear the channel
