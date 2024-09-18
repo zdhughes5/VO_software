@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-func parseWordUint32(event []byte, i int, j int, littleEndian bool) uint32 {
+func ParseWordUint32(event []byte, i int, j int, littleEndian bool) uint32 {
 
 	if littleEndian {
 		dataWord := binary.LittleEndian.Uint32(event[i:j])
@@ -18,12 +18,12 @@ func parseWordUint32(event []byte, i int, j int, littleEndian bool) uint32 {
 
 }
 
-func parseDWord0(event []byte, littleEndian bool) uint32 {
-	return parseWordUint32(event, 0, 4, littleEndian)
+func ParseDWord0(event []byte, littleEndian bool) uint32 {
+	return ParseWordUint32(event, 0, 4, littleEndian)
 }
 
 // Convert a 32-bit word to a decimal number with 16 integer bits and 16 fractional bits
-func convertToDecimal(word uint32) float64 {
+func ConvertToDecimal(word uint32) float64 {
 	// Extract the integer part (first 16 bits)
 	integerPart := uint16(word >> 16)
 
@@ -43,7 +43,7 @@ func convertToDecimal(word uint32) float64 {
 }
 
 // Convert a byte array of length 280 to an array of 70 decimal values
-func convertByteArrayToDecimals(data []byte) []float64 {
+func ConvertByteArrayToDecimals(data []byte) []float64 {
 	if len(data) != 280 {
 		panic("Input byte array must be of length 280")
 	}
@@ -53,14 +53,14 @@ func convertByteArrayToDecimals(data []byte) []float64 {
 		// Extract the 32-bit word from the byte array
 		word := binary.BigEndian.Uint32(data[i*4 : (i+1)*4])
 		// Convert the 32-bit word to a decimal value
-		decimals[i] = convertToDecimal(word)
+		decimals[i] = ConvertToDecimal(word)
 	}
 
 	return decimals
 }
 
 // Extract relevant pixel values from a padded array to a new array of 500 pixels
-func extractRelevantPixels(pixelValuesPadded [560]float64) [500]float64 {
+func ExtractRelevantPixels(pixelValuesPadded [560]float64) [500]float64 {
 	if len(pixelValuesPadded) != 560 {
 		panic("Input pixel array must be of length 560")
 	}
@@ -74,7 +74,7 @@ func extractRelevantPixels(pixelValuesPadded [560]float64) [500]float64 {
 	return pixelValues
 }
 
-func getTelescopeSendByteOffset(telescope int) (int, error) {
+func GetTelescopeSendByteOffset(telescope int) (int, error) {
 	if telescope == 1 {
 		return 0, nil
 	} else if telescope == 2 {

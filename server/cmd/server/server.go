@@ -1,9 +1,7 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +9,10 @@ import (
 	"math"
 	"net"
 	"os"
+	"server/pkg/data_parsing"
+	"server/pkg/ioutils"
+	"server/pkg/netutils"
+	"server/pkg/state"
 
 	//"sync"
 	//"os/exec"
@@ -18,7 +20,7 @@ import (
 	"time"
 )
 
-var extractEventNumber = parseDWord0
+var extractEventNumber = data_parsing.ParseDWord0
 var dataSaveDir string = "/home/zdhughes/optical_data/"
 
 type ctrlCmd uint32
@@ -55,7 +57,7 @@ const (
 // func extractEventNumber()
 
 // Declare the global variable
-var globalState SystemState
+var globalState state.SystemState
 
 var (
 	//jobIsRunning   bool
@@ -90,7 +92,7 @@ func main() {
 
 	////////// Establish Connections //////////
 	// For receiving commands to this server.
-	udpControlConn, err := establishUDPConnection(controlConnIP)
+	udpControlConn, err := netutils.EstablishUDPConnection(controlConnIP)
 	if err != nil {
 		log.Panic("Got error in establishing control connection:", err)
 	}
@@ -123,11 +125,11 @@ func main() {
 		switch cmd {
 		case startRunCmd:
 
+			runDuration := uint64(receivedMap["duration"].(float64))
 			runNumber := uint64(receivedMap["runNumber"].(float64))
 			runNumberString := strconv.FormatUint(runNumber, 10)
-			runDuration := uint64(receivedMap["duration"].(float64))
-			//telescopes := receivedMap["telescopes"].([]interface{})
-			//telescopeInts := make([]int, len(telescopes))
+			sendInterval := uint32(receivedMap["sendInterval"].(float64))
+			dataSaveDir = receivedMap["dataSaveDir"].(string)
 			if stateContent, ok := receivedMap["state"].(string); ok {
 				err := json.Unmarshal([]byte(stateContent), &globalState)
 				if err != nil {
@@ -136,19 +138,12 @@ func main() {
 				}
 				log.Printf("Successfully loaded state from state.json")
 			}
-			//fmt.Printf("globalState: %v\n", globalState)
-			telescopeInts := getTelescopesPresent()
-			fmt.Printf("globalState: %v\n", telescopeInts)
-			/*for i, val := range telescopes {
-				telescopeInts[i] = int(val.(float64))
-			}*/
-			sendInterval := uint32(receivedMap["sendInterval"].(float64))
 
 			log.Printf("Got start run command with run number %d and duration %d:", runNumber, runDuration)
 			if runReady {
 				runReady = false
 				log.Println("Starting data logging...")
-				go startHarvestersForRun(runDuration, runNumberString, telescopeInts, sendInterval)
+				go startHarvestersForRun(runDuration, runNumberString, sendInterval, dataSaveDir)
 
 			} else {
 				log.Println("Data run already running.")
@@ -158,7 +153,7 @@ func main() {
 			listenIP := receivedMap["listenIP"].(string)
 			forwardIP := receivedMap["forwardIP"].(string)
 			log.Printf("Got start data forwarding command with listen IP %s and forward IP %s:", listenIP, forwardIP)
-			go startDataForwarding(listenIP, forwardIP, stopForwarding)
+			go netutils.StartDataForwarding(listenIP, forwardIP, stopForwarding)
 
 		case stopDataForwardingCmd:
 			stopForwarding <- struct{}{}
@@ -181,41 +176,14 @@ func resetStart() {
 	runReady = true
 }
 
-// createRunFile is a function that creates a run file for a given run number and telescope.
-// It takes the run number as a string and the telescope number as an integer.
-// The function returns a pointer to the created file and an error, if any.
-// If the file already exists, it appends a random string to the file name and creates a new file.
-// If there is an error creating the output file, it panics with the error message.
-func createRunFile(runNumber string, telescope int) (*os.File, error) {
-	telescopeString := strconv.Itoa(telescope)
-	outputFileName := dataSaveDir + runNumber + "_" + telescopeString + ".bin"
-	randomString, _ := generateRandomString(16)
-
-	if _, existsErr := os.Stat(outputFileName); os.IsNotExist(existsErr) {
-		outputFile, createErr := os.Create(outputFileName)
-		if createErr != nil {
-			log.Panicf("Got error creating output file: %v", createErr)
-		}
-		return outputFile, nil
-	} else {
-		log.Println("File already exists:", outputFileName, "Check you're run number!")
-		outputFileName = dataSaveDir + runNumber + "_" + telescopeString + "_" + randomString + ".bin"
-		log.Println("Shunting data to:", outputFileName)
-		outputFile, createErr := os.Create(outputFileName)
-		if createErr != nil {
-			log.Panicf("Got error creating output file: %v", createErr)
-		}
-		return outputFile, nil
-	}
-}
-
-func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, sendInterval uint32) {
+func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint32, dataSaveDir string) {
 
 	defer resetStart()
 
 	startListening := make(chan struct{})
 	listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
 	stopListening := make(chan struct{})
+	telescopes := state.GetTelescopesPresentInt(&globalState)
 	eventBuilderChannels := make([]chan eventBuilderData, len(telescopes)) // One per telescope.
 	for i := range eventBuilderChannels {
 		eventBuilderChannels[i] = make(chan eventBuilderData, 100000)
@@ -225,23 +193,23 @@ func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, 
 	// NEED TO CREATE CONNECTIONS HERE AND CLOSE THEM WHEN TIMER ENDS TO PREVENT HANGING.
 	// MAKE SHUNT FILENAME HERE AND PASS SO THEY ALL SHARE IT.
 	for i, telescope := range telescopes {
-		harvesterIPs, err := getPresentHarvesterIPArray(telescope)
+		harvesterIPs, err := state.GetHarvestersPresentIPs(&globalState, telescope)
 		if err != nil {
 			log.Panic("Got error in getting harvester IP array:", err)
 		}
-		telescopeRunFile, runErr := createRunFile(runNumber, telescope)
+		telescopeRunFile, runErr := ioutils.CreateRunFile(dataSaveDir, runNumber, telescope)
 		if runErr != nil {
 			log.Panic("Got error in creating run file:", runErr)
 		}
 
 		for _, harvesterIP := range harvesterIPs {
-			udpHarvesterConn, udpErr := establishUDPConnection(harvesterIP)
+			udpHarvesterConn, udpErr := netutils.EstablishUDPConnection(harvesterIP)
 			if udpErr != nil {
 				log.Panic("Got error in establishing control connection:", udpErr)
 			}
 			defer udpHarvesterConn.Close()
 
-			harvesterPosition, err := getTelescopePositionFromIP(harvesterIP)
+			harvesterPosition, err := state.GetHarvesterLocalPositionFromIP(&globalState, harvesterIP)
 			if err != nil {
 				log.Panicf("Got error getting harvester position: %v", err)
 			}
@@ -253,7 +221,7 @@ func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, 
 		}
 	}
 
-	udpGUIConn, udpErr := establishUDPConnectionForWrite(guiIP)
+	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(guiIP)
 	if udpErr != nil {
 		log.Panic("Got error in establishing GUI connection:", udpErr)
 	}
@@ -272,15 +240,6 @@ func startHarvestersForRun(duration uint64, runNumber string, telescopes []int, 
 
 }
 
-func allTrue(arr []bool) bool {
-	for _, v := range arr {
-		if !v {
-			return false
-		}
-	}
-	return true
-}
-
 func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<- telescopeData, startListening <-chan struct{}, stopListening <-chan struct{}, telescope int) {
 
 	// I don't know why this happens: "panic: runtime error:
@@ -296,7 +255,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 	eventBuilderData := eventBuilderData{Source: harvesterID{Harvester: 0, Telescope: 0}, Data: emptyBuf}
 	harvesterChannels := [2]int{0, 0}
 	//harvestersPresent := make([]bool, 8) // Need to make a function to get the number of actual harvesters present. And a harvesterNotPresent function.
-	harvestersPresent, presentErr := getMissingHarvesters(telescope)
+	harvestersPresent, presentErr := state.GetHarvestersMissingBool(&globalState, telescope)
 	if presentErr != nil {
 		log.Panic("Got error in getting missing harvesters:", presentErr)
 	}
@@ -320,7 +279,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 			// Resetting the data every 32 events makes sure that it doesn't get too out of sync.
 			if j > 32 {
 				pixelValuesPadded = [560]float64{}
-				harvestersPresent, _ = getMissingHarvesters(telescope)
+				harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
 				j = 0
 			}
 			/*if i%1000 == 0 {
@@ -328,19 +287,19 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 			}*/
 			eventBuilderData = <-eventBuilderChannel
 			//log.Printf("Got event from harvester %d on telescope %d\n", eventBuilderData.Source.Harvester, eventBuilderData.Source.Telescope)
-			harvesterChannels, _ = getHarvesterChannel(eventBuilderData.Source.Telescope, eventBuilderData.Source.Harvester)
+			harvesterChannels, _ = state.GetHarvesterChannel(&globalState, eventBuilderData.Source.Telescope, eventBuilderData.Source.Harvester)
 			//log.Printf("Harvester channels: %v\n", harvesterChannels)
 			//log.Printf("harvestersPresent: %v\n", harvestersPresent)
 			harvestersPresent[eventBuilderData.Source.Harvester] = true
-			copy(pixelValuesPadded[harvesterChannels[0]:harvesterChannels[1]], convertByteArrayToDecimals(eventBuilderData.Data[28:308]))
-			if allHarvesters(harvestersPresent) {
+			copy(pixelValuesPadded[harvesterChannels[0]:harvesterChannels[1]], data_parsing.ConvertByteArrayToDecimals(eventBuilderData.Data[28:308]))
+			if state.AllHarvesters(harvestersPresent) {
 				//fmt.Printf("loop is at %d\n", i)
-				pixelValues := extractRelevantPixels(pixelValuesPadded)
+				pixelValues := data_parsing.ExtractRelevantPixels(pixelValuesPadded)
 				guiData := telescopeData{Telescope: eventBuilderData.Source.Telescope, Data: pixelValues}
 				guiChannel <- guiData
-				fmt.Printf("Sent data to GUI\n")
+				//fmt.Printf("Sent data to GUI\n")
 				pixelValuesPadded = [560]float64{}
-				harvestersPresent, _ = getMissingHarvesters(telescope)
+				harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
 				j = 0
 			}
 
@@ -353,16 +312,16 @@ func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
 
 	outGoingData := make([]byte, 8000)
 	udpGUIConn.Write(outGoingData)
-	telescopesPresent, presentErr := getMissingTelescopes()
+	telescopesPresent, presentErr := state.GetTelescopesMissingBool(&globalState)
 	if presentErr != nil {
 		log.Panic("Got error in getting missing harvesters:", presentErr)
 	}
 
 	for i := 0; ; i++ {
 		thisData := <-guiChannel
-		fmt.Printf("Got data from telescope %d\n", thisData.Telescope)
+		//fmt.Printf("Got data from telescope %d\n", thisData.Telescope)
 		thisTelescope := thisData.Telescope
-		thisTelescopeOffset, offsetErr := getTelescopeSendByteOffset(thisTelescope)
+		thisTelescopeOffset, offsetErr := data_parsing.GetTelescopeSendByteOffset(thisTelescope)
 		if offsetErr != nil {
 			log.Panic("Got error in getting telescope send byte offset:", offsetErr)
 			//log.Printf("Got error in getting telescope send byte offset: %v\n", offsetErr)
@@ -374,37 +333,26 @@ func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
 			offset += 4
 		}
 		telescopesPresent[thisTelescope-1] = true
-		if allTelescopes(telescopesPresent) {
+		if state.AllTelescopes(telescopesPresent) {
 			//fmt.Printf("Sending this data to the GUI: %v\n", thisData)
 			_, _ = udpGUIConn.Write(outGoingData)
-			telescopesPresent, _ = getMissingTelescopes()
+			telescopesPresent, _ = state.GetTelescopesMissingBool(&globalState)
 			// Drain/flush/clear the channel
 			for len(guiChannel) > 0 {
 				<-guiChannel
 			}
 
 		}
-		//fmt.Printf("Got data from telescope %d\n", thisData.Telescope)
 	}
 
 }
-
-/*func guiListener(guiConn *net.UDPConn, guiChannels []chan guiData) {
-
-	buf := make([]byte, 308)
-
-	for {
-		n, _, _ := guiConn.ReadFromUDP(buf)
-		guiChannel <- guiData{Harvester: 0, Data: buf}
-	}
-
-}*/
 
 func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvesterID, outputFile *os.File, startListening <-chan struct{}, stopListening <-chan struct{}, sendInterval uint32, eventBuilderChannel chan<- eventBuilderData) {
 
 	buf := make([]byte, 308)
 	bufIn := [308]byte{}
 	thisIP := udpHarvesterConn.LocalAddr().String()
+	arrayPosition, _ := state.GetHarvesterArrayPositionFromIP(&globalState, thisIP)
 
 	// Wait for calling routine to say go.
 	<-startListening
@@ -412,7 +360,7 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 		for i := 0; ; i++ {
 			select {
 			case <-stopListening:
-				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester listener\n", thisIP, i)
+				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
 				return
 			default:
 				n, _, _ := udpHarvesterConn.ReadFromUDP(buf)
@@ -427,7 +375,7 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 		for i := 0; ; i++ {
 			select {
 			case <-stopListening:
-				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester listener\n", thisIP, i)
+				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
 				return
 			default:
 				n, _, _ := udpHarvesterConn.ReadFromUDP(buf)
@@ -436,26 +384,4 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 		}
 	}
 
-}
-
-func generateRandomString(length int) (string, error) {
-	// Calculate the number of bytes needed
-	numBytes := length / 2
-
-	// Generate random bytes
-	randomBytes := make([]byte, numBytes)
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		return "", err
-	}
-
-	// Convert bytes to hexadecimal string
-	randomString := hex.EncodeToString(randomBytes)
-
-	// Trim the string to the desired length
-	if len(randomString) > length {
-		randomString = randomString[:length]
-	}
-
-	return randomString, nil
 }

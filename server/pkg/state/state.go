@@ -70,6 +70,16 @@ func LoadStateFromFile(filename string) (*SystemState, error) {
 	return &state, nil
 }
 
+func GetStateFileContents(filename string) ([]byte, error) {
+	stateFileContent, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println("Error reading state.json:", err)
+		return nil, err
+	}
+
+	return stateFileContent, nil
+}
+
 // Prints the state for debugging
 func PrintState(state *SystemState) {
 	state.RLock()
@@ -116,6 +126,20 @@ func GetHarvesterLocalPositionFromIP(state *SystemState, ipAddress string) (int,
 		for _, harvester := range telescope.Harvesters {
 			if harvester.IP == ipAddress {
 				return harvester.LocalPosition, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("harvester with IP address %s not found", ipAddress)
+}
+
+func GetHarvesterArrayPositionFromIP(state *SystemState, ipAddress string) (int, error) {
+	state.RLock()
+	defer state.RUnlock()
+
+	for _, telescope := range state.Telescopes {
+		for _, harvester := range telescope.Harvesters {
+			if harvester.IP == ipAddress {
+				return harvester.ArrayPosition, nil
 			}
 		}
 	}
@@ -189,6 +213,25 @@ func GetHarvestersPresentIPs(state *SystemState, telescopeNumber int) ([]string,
 	return nil, fmt.Errorf("telescope %d not found", telescopeNumber)
 }
 
+// Function to get the local positions of present harvesters for a given telescope number
+func GetHarvestersPresentInt(state *SystemState, telescopeNumber int) ([]int, error) {
+	state.RLock()
+	defer state.RUnlock()
+
+	var positions []int
+	for _, telescope := range state.Telescopes {
+		if telescope.Telescope == telescopeNumber {
+			for _, harvester := range telescope.Harvesters {
+				if !harvester.Missing {
+					positions = append(positions, harvester.LocalPosition)
+				}
+			}
+			return positions, nil
+		}
+	}
+	return nil, fmt.Errorf("telescope %d not found", telescopeNumber)
+}
+
 func GetHarvestersMissingBool(state *SystemState, telescopeNumber int) ([8]bool, error) {
 	state.RLock()
 	defer state.RUnlock()
@@ -215,6 +258,15 @@ func AllHarvesters(arr [8]bool) bool {
 }
 
 func AllTelescopes(arr [4]bool) bool {
+	for _, v := range arr {
+		if !v {
+			return false
+		}
+	}
+	return true
+}
+
+func AllTrue(arr []bool) bool {
 	for _, v := range arr {
 		if !v {
 			return false

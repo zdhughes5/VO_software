@@ -1,0 +1,450 @@
+2024/09/17 17:07:48 Server started.
+2024/09/17 17:10:14 Got 5938 bytes from UDP control packet from address 127.0.0.1:33860 
+2024/09/17 17:10:14 Successfully loaded state from state.json
+2024/09/17 17:10:14 Got start run command with run number 1 and duration 180:
+2024/09/17 17:10:14 Starting data logging...
+2024/09/17 17:10:14 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 17:10:14 Shunting data to: /home/zdhughes/optical_data/1_1_23e2c1805403b28f.bin
+2024/09/17 17:13:14 Data logging ended.
+2024/09/17 17:13:14 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 2000000 events on harvester listener
+2024/09/17 18:26:13 Server started.
+2024/09/17 18:30:22 Got 5938 bytes from UDP control packet from address 127.0.0.1:34035 
+2024/09/17 18:30:22 Successfully loaded state from state.json
+2024/09/17 18:30:22 Got start run command with run number 1 and duration 180:
+2024/09/17 18:30:22 Starting data logging...
+2024/09/17 18:30:22 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 18:30:22 Shunting data to: /home/zdhughes/optical_data/1_1_5b8bf3ca6d0b4a36.bin
+2024/09/17 18:33:22 Data logging ended.
+2024/09/17 18:33:22 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 1 events on harvester listener
+2024/09/17 18:33:22 Stopping event builder for telescope 1.
+Got 1 events on event builder
+2024/09/17 18:34:48 Got 5938 bytes from UDP control packet from address 127.0.0.1:49804 
+2024/09/17 18:34:48 Successfully loaded state from state.json
+2024/09/17 18:34:48 Got start run command with run number 1 and duration 180:
+2024/09/17 18:34:48 Starting data logging...
+2024/09/17 18:34:48 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 18:34:48 Shunting data to: /home/zdhughes/optical_data/1_1_5e5d9231164fbc88.bin
+2024/09/17 18:37:48 Data logging ended.
+2024/09/17 18:37:48 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 1 events on harvester listener
+2024/09/17 18:37:48 Stopping event builder for telescope 1.
+Got 1 events on event builder
+2024/09/17 18:39:18 Got 5938 bytes from UDP control packet from address 127.0.0.1:40649 
+2024/09/17 18:39:18 Successfully loaded state from state.json
+2024/09/17 18:39:18 Got start run command with run number 1 and duration 180:
+2024/09/17 18:39:18 Starting data logging...
+2024/09/17 18:39:18 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 18:39:18 Shunting data to: /home/zdhughes/optical_data/1_1_7f8ad3918a9060cb.bin
+2024/09/17 18:42:18 Data logging ended.
+2024/09/17 18:42:18 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 239751 events on harvester listener
+2024/09/17 19:31:39 Got 5938 bytes from UDP control packet from address 127.0.0.1:44087 
+2024/09/17 19:31:39 Successfully loaded state from state.json
+2024/09/17 19:31:39 Got start run command with run number 1 and duration 180:
+2024/09/17 19:31:39 Starting data logging...
+2024/09/17 19:31:39 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:31:39 Shunting data to: /home/zdhughes/optical_data/1_1_e2415d51ab113fa5.bin
+2024/09/17 19:34:39 Data logging ended.
+2024/09/17 19:34:39 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 17992 events on harvester listener
+2024/09/17 19:43:35 Got 5937 bytes from UDP control packet from address 127.0.0.1:39467 
+2024/09/17 19:43:35 Successfully loaded state from state.json
+2024/09/17 19:43:35 Got start run command with run number 1 and duration 20:
+2024/09/17 19:43:35 Starting data logging...
+2024/09/17 19:43:35 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:43:35 Shunting data to: /home/zdhughes/optical_data/1_1_456d67cbbba0c159.bin
+2024/09/17 19:43:55 Data logging ended.
+2024/09/17 19:43:55 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 2000 events on harvester listener
+2024/09/17 19:46:15 Server started.
+2024/09/17 19:46:22 Got 5937 bytes from UDP control packet from address 127.0.0.1:40140 
+2024/09/17 19:46:22 Successfully loaded state from state.json
+2024/09/17 19:46:22 Got start run command with run number 1 and duration 20:
+2024/09/17 19:46:22 Starting data logging...
+2024/09/17 19:46:22 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:46:22 Shunting data to: /home/zdhughes/optical_data/1_1_5f682705a1513764.bin
+2024/09/17 19:46:42 Data logging ended.
+2024/09/17 19:46:42 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 20000 events on harvester listener
+2024/09/17 19:47:18 Server started.
+2024/09/17 19:47:24 Got 5937 bytes from UDP control packet from address 127.0.0.1:40312 
+2024/09/17 19:47:24 Successfully loaded state from state.json
+2024/09/17 19:47:24 Got start run command with run number 1 and duration 20:
+2024/09/17 19:47:24 Starting data logging...
+2024/09/17 19:47:24 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:47:24 Shunting data to: /home/zdhughes/optical_data/1_1_68c9c5363976f26a.bin
+2024/09/17 19:47:44 Data logging ended.
+2024/09/17 19:47:44 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 20000 events on harvester 0 listener
+2024/09/17 19:49:59 Got 5947 bytes from UDP control packet from address 127.0.0.1:43891 
+2024/09/17 19:49:59 Successfully loaded state from state.json
+2024/09/17 19:49:59 Got start run command with run number 1 and duration 20:
+2024/09/17 19:49:59 Starting data logging...
+2024/09/17 19:49:59 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:49:59 Shunting data to: /home/zdhughes/optical_data/1_1_ededbc86ca05d492.bin
+2024/09/17 19:49:59 File already exists: /home/zdhughes/optical_data/1_2.bin Check you're run number!
+2024/09/17 19:49:59 Shunting data to: /home/zdhughes/optical_data/1_2_07ca282bbbb637d8.bin
+2024/09/17 19:49:59 File already exists: /home/zdhughes/optical_data/1_3.bin Check you're run number!
+2024/09/17 19:49:59 Shunting data to: /home/zdhughes/optical_data/1_3_7eda652bf757d036.bin
+2024/09/17 19:49:59 File already exists: /home/zdhughes/optical_data/1_4.bin Check you're run number!
+2024/09/17 19:49:59 Shunting data to: /home/zdhughes/optical_data/1_4_0f7c596799a15daa.bin
+2024/09/17 19:50:19 Data logging ended.
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30032.
+Got 7915 events on harvester 31 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30031.
+Got 8686 events on harvester 30 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30030.
+Got 9482 events on harvester 29 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30029.
+Got 9399 events on harvester 28 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30028.
+Got 9156 events on harvester 27 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30027.
+Got 9121 events on harvester 26 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30026.
+Got 8977 events on harvester 25 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30025.
+Got 9825 events on harvester 24 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30024.
+Got 9908 events on harvester 23 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30023.
+Got 7957 events on harvester 22 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30022.
+Got 8195 events on harvester 21 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30021.
+Got 8150 events on harvester 20 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30020.
+Got 10020 events on harvester 19 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30019.
+Got 9023 events on harvester 18 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30018.
+Got 9878 events on harvester 17 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30017.
+Got 9712 events on harvester 16 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30016.
+Got 10398 events on harvester 15 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30014.
+Got 10205 events on harvester 13 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30015.
+Got 9056 events on harvester 14 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30013.
+Got 9020 events on harvester 12 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30012.
+Got 8791 events on harvester 11 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30011.
+Got 8805 events on harvester 10 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30010.
+Got 8704 events on harvester 9 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30008.
+Got 10062 events on harvester 7 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30009.
+Got 11015 events on harvester 8 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30006.
+Got 9066 events on harvester 5 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30005.
+Got 8542 events on harvester 4 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30004.
+Got 9063 events on harvester 3 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30003.
+Got 8605 events on harvester 2 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30002.
+Got 11314 events on harvester 1 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30007.
+Got 9898 events on harvester 6 listener
+2024/09/17 19:50:19 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 9813 events on harvester 0 listener
+2024/09/17 19:52:17 Got 5947 bytes from UDP control packet from address 127.0.0.1:59378 
+2024/09/17 19:52:17 Successfully loaded state from state.json
+2024/09/17 19:52:17 Got start run command with run number 1 and duration 20:
+2024/09/17 19:52:17 Starting data logging...
+2024/09/17 19:52:17 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:52:17 Shunting data to: /home/zdhughes/optical_data/1_1_3a9806171e934e67.bin
+2024/09/17 19:52:17 File already exists: /home/zdhughes/optical_data/1_2.bin Check you're run number!
+2024/09/17 19:52:17 Shunting data to: /home/zdhughes/optical_data/1_2_c975f727538b6c32.bin
+2024/09/17 19:52:17 File already exists: /home/zdhughes/optical_data/1_3.bin Check you're run number!
+2024/09/17 19:52:17 Shunting data to: /home/zdhughes/optical_data/1_3_45f082079f7c7301.bin
+2024/09/17 19:52:17 File already exists: /home/zdhughes/optical_data/1_4.bin Check you're run number!
+2024/09/17 19:52:17 Shunting data to: /home/zdhughes/optical_data/1_4_0fcf43aa5c7a59fd.bin
+2024/09/17 19:52:37 Data logging ended.
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30031.
+Got 200000 events on harvester 30 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30032.
+Got 200000 events on harvester 31 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30030.
+Got 200000 events on harvester 29 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30029.
+Got 200000 events on harvester 28 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30028.
+Got 200000 events on harvester 27 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30027.
+Got 200000 events on harvester 26 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30026.
+Got 200000 events on harvester 25 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30025.
+Got 200000 events on harvester 24 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30024.
+Got 200000 events on harvester 23 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30023.
+Got 200000 events on harvester 22 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30022.
+Got 200000 events on harvester 21 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30021.
+Got 200000 events on harvester 20 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30020.
+Got 200000 events on harvester 19 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30019.
+Got 200000 events on harvester 18 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30018.
+Got 200000 events on harvester 17 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30017.
+Got 200000 events on harvester 16 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30016.
+Got 200000 events on harvester 15 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30015.
+Got 200000 events on harvester 14 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30014.
+Got 200000 events on harvester 13 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30013.
+Got 200000 events on harvester 12 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30012.
+Got 200000 events on harvester 11 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30011.
+Got 200000 events on harvester 10 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30010.
+Got 200000 events on harvester 9 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30009.
+Got 200000 events on harvester 8 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30008.
+Got 200000 events on harvester 7 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30007.
+Got 200000 events on harvester 6 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30006.
+Got 200000 events on harvester 5 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30005.
+Got 200000 events on harvester 4 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30004.
+Got 200000 events on harvester 3 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30003.
+Got 200000 events on harvester 2 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30002.
+Got 200000 events on harvester 1 listener
+2024/09/17 19:52:37 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 200000 events on harvester 0 listener
+2024/09/17 19:53:03 Server started.
+2024/09/17 19:53:06 Got 5947 bytes from UDP control packet from address 127.0.0.1:33449 
+2024/09/17 19:53:06 Successfully loaded state from state.json
+2024/09/17 19:53:06 Got start run command with run number 1 and duration 20:
+2024/09/17 19:53:06 Starting data logging...
+2024/09/17 19:53:06 File already exists: /home/zdhughes/optical_data/1_1.bin Check you're run number!
+2024/09/17 19:53:06 Shunting data to: /home/zdhughes/optical_data/1_1_2156972873731651.bin
+2024/09/17 19:53:06 File already exists: /home/zdhughes/optical_data/1_2.bin Check you're run number!
+2024/09/17 19:53:06 Shunting data to: /home/zdhughes/optical_data/1_2_b1bb494297bb4dcb.bin
+2024/09/17 19:53:06 File already exists: /home/zdhughes/optical_data/1_3.bin Check you're run number!
+2024/09/17 19:53:06 Shunting data to: /home/zdhughes/optical_data/1_3_0e93581bc8ffe942.bin
+2024/09/17 19:53:06 File already exists: /home/zdhughes/optical_data/1_4.bin Check you're run number!
+2024/09/17 19:53:06 Shunting data to: /home/zdhughes/optical_data/1_4_13b30d9a784f6d4f.bin
+2024/09/17 19:53:26 Data logging ended.
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30032.
+Got 200000 events on harvester 31 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30031.
+Got 200000 events on harvester 30 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30030.
+Got 200000 events on harvester 29 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30029.
+Got 200000 events on harvester 28 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30028.
+Got 200000 events on harvester 27 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30027.
+Got 200000 events on harvester 26 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30026.
+Got 200000 events on harvester 25 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30025.
+Got 200000 events on harvester 24 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30024.
+Got 200000 events on harvester 23 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30023.
+Got 200000 events on harvester 22 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30022.
+Got 200000 events on harvester 21 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30021.
+Got 200000 events on harvester 20 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30020.
+Got 200000 events on harvester 19 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30019.
+Got 200000 events on harvester 18 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30018.
+Got 200000 events on harvester 17 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30017.
+Got 200000 events on harvester 16 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30016.
+Got 200000 events on harvester 15 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30015.
+Got 200000 events on harvester 14 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30014.
+Got 200000 events on harvester 13 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30013.
+Got 200000 events on harvester 12 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30012.
+Got 200000 events on harvester 11 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30011.
+Got 200000 events on harvester 10 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30010.
+Got 200000 events on harvester 9 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30009.
+Got 200000 events on harvester 8 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30008.
+Got 200000 events on harvester 7 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30007.
+Got 200000 events on harvester 6 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30006.
+Got 200000 events on harvester 5 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30005.
+Got 200000 events on harvester 4 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30004.
+Got 200000 events on harvester 3 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30003.
+Got 200000 events on harvester 2 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30002.
+Got 200000 events on harvester 1 listener
+2024/09/17 19:53:26 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 200000 events on harvester 0 listener
+2024/09/17 19:54:25 Got 5948 bytes from UDP control packet from address 127.0.0.1:35129 
+2024/09/17 19:54:25 Successfully loaded state from state.json
+2024/09/17 19:54:25 Got start run command with run number 1 and duration 200:
+2024/09/17 19:54:25 Starting data logging...
+2024/09/17 19:57:45 Data logging ended.
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 1996821 events on harvester 0 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30032.
+Got 1998476 events on harvester 31 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30031.
+Got 1998519 events on harvester 30 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30030.
+Got 1998448 events on harvester 29 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30029.
+Got 1998546 events on harvester 28 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30028.
+Got 1998586 events on harvester 27 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30027.
+Got 1998599 events on harvester 26 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30026.
+Got 1998497 events on harvester 25 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30025.
+Got 1998499 events on harvester 24 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30024.
+Got 1996122 events on harvester 23 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30023.
+Got 1996004 events on harvester 22 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30022.
+Got 1996075 events on harvester 21 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30021.
+Got 1995975 events on harvester 20 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30020.
+Got 1996056 events on harvester 19 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30019.
+Got 1995961 events on harvester 18 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30018.
+Got 1996012 events on harvester 17 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30017.
+Got 1995985 events on harvester 16 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30016.
+Got 1998418 events on harvester 15 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30015.
+Got 1998357 events on harvester 14 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30014.
+Got 1998421 events on harvester 13 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30013.
+Got 1998453 events on harvester 12 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30012.
+Got 1998440 events on harvester 11 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30011.
+Got 1998409 events on harvester 10 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30010.
+Got 1998477 events on harvester 9 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30009.
+Got 1998513 events on harvester 8 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30008.
+Got 1998184 events on harvester 7 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30007.
+Got 1998224 events on harvester 6 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30006.
+Got 1998180 events on harvester 5 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30005.
+Got 1998280 events on harvester 4 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30004.
+Got 1998115 events on harvester 3 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30003.
+Got 1998021 events on harvester 2 listener
+2024/09/17 19:57:45 Stopping harvester listener at IP 127.0.0.1:30002.
+Got 1998081 events on harvester 1 listener
+2024/09/17 20:00:57 Got 5948 bytes from UDP control packet from address 127.0.0.1:48260 
+2024/09/17 20:00:57 Successfully loaded state from state.json
+2024/09/17 20:00:57 Got start run command with run number 1 and duration 200:
+2024/09/17 20:00:57 Starting data logging...
+2024/09/17 20:04:17 Data logging ended.
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30018.
+Got 2637469 events on harvester 17 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30026.
+Got 2653080 events on harvester 25 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30012.
+Got 2629981 events on harvester 11 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30024.
+Got 2654180 events on harvester 23 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30029.
+Got 2617421 events on harvester 28 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30030.
+Got 2669964 events on harvester 29 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30028.
+Got 2630503 events on harvester 27 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30005.
+Got 2631088 events on harvester 4 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30027.
+Got 2638752 events on harvester 26 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30003.
+Got 2625022 events on harvester 2 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30019.
+Got 2670630 events on harvester 18 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30002.
+Got 2639767 events on harvester 1 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30004.
+Got 2630856 events on harvester 3 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30015.
+Got 2625558 events on harvester 14 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30014.
+Got 2637494 events on harvester 13 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30031.
+Got 2626556 events on harvester 30 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30011.
+Got 2625448 events on harvester 10 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30023.
+Got 2654404 events on harvester 22 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30025.
+Got 2653796 events on harvester 24 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30032.
+Got 2654259 events on harvester 31 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30021.
+Got 2653827 events on harvester 20 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30007.
+Got 2654710 events on harvester 6 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30006.
+Got 2631655 events on harvester 5 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30020.
+Got 2653572 events on harvester 19 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30022.
+Got 2654019 events on harvester 21 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30013.
+Got 2630437 events on harvester 12 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30017.
+Got 2670499 events on harvester 16 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30001.
+Got 2669473 events on harvester 0 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30010.
+Got 2669476 events on harvester 9 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30009.
+Got 2670313 events on harvester 8 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30008.
+Got 2669785 events on harvester 7 listener
+2024/09/17 20:04:17 Stopping harvester listener at IP 127.0.0.1:30016.
+Got 2669664 events on harvester 15 listener
