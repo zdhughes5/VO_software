@@ -148,6 +148,14 @@ extern "C" {
     int fadc_set_cfd_type( int boardnum, int chan, unsigned long val);
     unsigned long fadc_get_cfd_type( int boardnum, int chan );
 
+    void set_pedvar_reset();
+    void set_pedvar_1khz();
+    void set_pedvar_2khz();
+    void set_pedvar_4khz();
+    void set_pedvar_8khz();
+    void set_pedvar_16khz();
+    void set_pedvar_off();
+
     /* for debugging */
     vme_bus_handle_t fadc_get_bus_handle();
     vme_dma_handle_t fadc_get_dma_handle();

@@ -97,6 +97,15 @@
 #define CH_AREA_DISCRIM 0x3       /* subadr for area discrim + ch_disable*/
 #define CH_CLR_SCALER   0xc
 
+
+#define WR_PEDVAR_RST      0xd    /* issue command to reset pedvar module */
+#define WR_PEDVAR_1KHZ     0x6    /* issue command to enable pedvar module and set integration window frequency to 1 KHz*/
+#define WR_PEDVAR_2KHZ     0x7    /* issue command to enable pedvar module and set integration window frequency to 2 KHz*/
+#define WR_PEDVAR_4KHZ     0x8    /* issue command to enable pedvar module and set integration window frequency to 4 KHz*/
+#define WR_PEDVAR_8KHZ     0x9    /* issue command to enable pedvar module and set integration window frequency to 8 KHz*/
+#define WR_PEDVAR_16KHZ    0xa    /* issue command to enable pedvar module and set integration window frequency to 16 KHz*/
+#define WR_PEDVAR_OFF      0xb    /* issue command to disable pedvar module */
+
 struct ChanSettings {
     unsigned long area_width;
     unsigned long area_offs;

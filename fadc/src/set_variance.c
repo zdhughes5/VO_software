@@ -1,7 +1,7 @@
-// gcc server.c -lfadc -lvme -lm -o server
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // VME/FADC libraries.
 #include <vme/vme_api.h>
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int low, high, numboards;
+    int low, high, numboards, i;
 
     fadc_init();
     fadc_verbose(1);
@@ -87,8 +87,10 @@ for (i = 0; i < fadc_num_boards(); i++) {
                 exit(1);
         }
 
+		usleep(1000);
         fadc_set_mode(i, FADC_MODE);
         printf("pedvar %dkHz set on board %d\n", option, i);
+	
     }
 }
 

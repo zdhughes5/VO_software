@@ -1,0 +1,229 @@
+\documentclass{article}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+
+%=====================================================
+% macros
+
+\newcommand{\libfadc}{\emph{\texttt{libfadc}} }
+\newcommand{\F}[1]{\texttt{#1}}
+
+%=====================================================
+
+\begin{document}
+
+  
+
+  \title{Usage Guide for \libfadc}
+  \author{Karl Kosack}
+  \maketitle
+  \tableofcontents
+
+\section{Introduction}
+
+The \libfadc library provides a straightforward C interface
+\footnote{The C language was chosen initially for portability between
+QNX4 and Linux. Of course, all functions will work fine in C++ as
+well. If it turns out to be absolutely necessary, I will convert the
+library to C++.} to an FADC crate (several FADC boards plus a
+Clock/Trigger board). Currently, \libfadc takes care of the VME
+mapping, all the low-level board access, and retains the state of each
+board in memory (board settings, etc).  For a list of the \libfadc API
+functions, see the Doxygen generated documentation (\libfadc reference
+guide).
+
+\section{A simple example}
+
+Suppose we want to initialize a crate, do a buffer ram test to make
+sure the boards are working, set some parameters, and then grab a few
+events of data.  The following code would accomplish this:
+
+First, we start the programs and call \F{fadc\_init()} to set up the
+VME interface.  \F{fadc\_init()} must be called before all other
+\libfadc functions (except \F{fadc\_set\_initial\_values()} and \F{fadc\_ignore\_board()}).
+
+\begin{verbatim}
+#include <stdio.h>
+#include <fadc.h>
+
+int main( void ) {
+  
+  int i,n;
+  unsigned long *cblt_buffer=NULL;
+
+  printf("Initializing %d FADC boards...\n", fadc_num_boards() );
+
+  if ( fadc_init() ) {
+    printf( "Failed to initialize.\n");
+    exit(1);
+  }
+
+\end{verbatim}
+
+Next, we put the FADC boards into WORD mode (disable all acquisition,
+but still accept commands), and test the buffer ram...
+
+\begin{verbatim}
+
+  fadc_set_mode( FADC_ALL, WORD_MODE );
+
+  for (i=0; i<fadc_num_boards(); i++) {
+    if (fadc_buffer_ram_test(i)) {
+      printf("Board %d failed the buffer ram test!\n",i);
+      fadc_exit();
+      exit(1);
+    }
+  }
+\end{verbatim}
+
+Finally, we set the lookback times (say to 120 ns for all boards and
+all channels), and some other parameters. Note that this could be done
+all at once using the \F{fadc\_load\_settings()} function, which
+reads all settings from a text file, but we may want to do it some
+other way. We can of course specify a specific board and channel
+instead of FADC\_ALL if needed.
+
+\begin{verbatim}
+
+  fadc_set_area_offset( FADC_ALL, FADC_ALL, 120 );
+  fadc_set_data_width( FADC_ALL, 16 );
+
+  ...
+
+\end{verbatim}
+
+Now, lets grab some events (10 in this example).  For that, we need to
+first put the boards into data acquisition mode (FADC\_MODE) and then
+poll the Clock/Trigger board for status (using
+\F{fadc\_got\_event()}).  When an event is received, each board with
+data should be read out.  This can be done in two ways: using a
+word-by-word transfer (using \F{fadc\_memcpy()}), or using a
+\emph{Chained Block Transfer} (CBLT).  The CBLT method allows much
+faster data rates, and all boards in the crate are read out in one
+pass, so lets look at that one.
+
+\begin{verbatim}
+
+  n=0;
+  int nwords=0;
+
+  /* Allocate memory for the CBLT buffer and initialize CBLT to use
+  board 0 as the 'first' board and  9 as the 'last' board */
+  
+  cblt_buffer = fadc_alloc_cblt_buffer( cblt_buffer, 0, 9 );
+
+  while(n < 10) {
+    
+    if ( fadc_got_event() ) {
+
+      /* we have an event, so read out the data */
+    
+      nwords = fadc_cblt();
+
+      /* Now the cblt_buffer is filled with nwords words of data */
+      
+      /* done reading, so issue an "event clear" */
+      /* to the Clock/Trigger board so the FADC's keep taking data */
+      
+      fadc_evt_clr();
+
+      n++;
+
+      /* do something with the buffer */
+      ...
+      
+    }
+  }
+
+  /* All done! */
+  fadc_exit();
+
+}
+
+\end{verbatim}
+
+\section{Other Comments} 
+
+\subsection{Disabling Boards}
+
+When \F{fadc\_init()} is called, it automatically initializes an
+entire crate of FADC boards (the total number of boards is defined in
+the library).  However, you may only want to initialize a few of the
+boards.  To do this, you need to tell \libfadc to ignore the inactive
+boards.
+
+\begin{verbatim}
+
+  /* only enable board 2 in the crate */
+  for (i=0; i<fadc_num_boards(); i++){
+    if (i != 2) fadc_ignore_board(i);
+  }
+\end{verbatim}
+
+\subsection{Disabling channels}
+
+You can disable a particular channel on a board using
+\F{fadc\_disable\_channel(board,chan)} and check whether it is
+disabled with \F{fadc\_is\_channel\_disabled(board,chan)}
+
+\subsection{Loading/Saving all settings}
+
+The functions \F{fadc\_load\_settings(board,filename)} and
+\F{fadc\_save\_settings(board,filename} allow you to easily save or
+load all of the settings for a particular board in one quick step,
+rather than setting each parameter individually.  The settings are
+saved in text format the specified file.
+
+
+\section{Low-level access}
+
+In addition to the high-level API, \libfadc also provides low-level
+access to the FADC and Clock/Trigger boards.  This includes a set of
+functions for writing to the various registers on the boards and for
+direct access to the memory-mapped-io hardware address space for each
+board.  To use these functions, you must include \F{fadc\_lowlevel.h}
+in your program.  See the \libfadc Reference Guide for a function
+reference.
+
+For example, to get a pointer to the beginning of the address space
+for FADC board 3 and read a few words of the buffer ram, do the
+following:
+
+\begin{verbatim}
+
+  unsigned long *lptr;
+  unsigned long dataword;
+  int i;
+
+  lptr = fadc_get_fadc_lptr( 3 );
+
+  for (i=0; i<5; i++) {
+    
+    dataword = lptr[i];
+    cout << "Buffer " << i << " = " << dataword << endl; 
+
+  }
+
+\end{verbatim}
+
+Or to write to a register (for instance to change the programmable
+board number), you would do the following:
+
+\begin{verbatim}
+
+  /* Set programmable board number on board 0 to be 2 */
+  /* The offset WR_BD_NO is defined in fadc_lowlevel.h */
+
+  unsigned long *fadc_lptr, *boardnum_register; 
+
+  fadc_lptr = fadc_get_fadc_lptr( 0 );
+  
+  boardnum_register = fadc_lptr + WR_BD_NO;
+  *boardnum_register = 2;
+
+\end{verbatim}
+
+
+
+
+\end{document}
