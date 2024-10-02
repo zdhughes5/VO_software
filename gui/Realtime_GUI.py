@@ -14,31 +14,24 @@ Created on Tue Oct 11 20:54:47 2022
 # Zero order simulated stars, gaussian smeared out over some spatial spread.
 # Do a ratio of integral fluxes for TXS in soft and medium.
 
-from start2 import Ui_MainWindow
+from GUI import Ui_MainWindow
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 from time import perf_counter
 from pyqtgraph.Qt.QtGui import QBrush, QColor
 from ast import literal_eval as  le
-#import PyQt5.sip as sip
 from PyQt6.QtNetwork import QHostAddress, QUdpSocket
 import sys
 from time import sleep
-import ctypes
-import os 
 import logging
-from functools import cached_property
-import zmq
-import pickle
-import uuid
-#import msgpack
-#import msgpack_numpy as m
 from string import ascii_lowercase as alc
 from string import ascii_uppercase as auc
-import matplotlib.pyplot as plt
-from scipy import spatial
-import queue
+import pymysql
+from astropy.coordinates import AltAz, SkyCoord, EarthLocation
+from astropy.time import Time
+from astropy import units as u
+import astroplan as apl
 
 
 
@@ -47,13 +40,7 @@ formatter = logging.Formatter(fs)
 logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-ENDPOINT = "ipc://routing.ipc"
-ENDPOINT = "tcp://localhost:5555"
-ENDPOINT2 = "tcp://localhost:5556"
 
-
-n = 0
-m = 0
 
 class LogSignalEmitter(QtCore.QObject):
     logSignal = QtCore.pyqtSignal(str, logging.LogRecord)
@@ -73,44 +60,170 @@ class QLogHandler(logging.Handler):
         msg = self.format(record)
         self.emitter.logSignal.emit(msg, record)
 
+class NamedSkyCoord(SkyCoord):
+    def __init__(self, *args, star_name=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.star_name = star_name
 
-class ListenSocket(QUdpSocket):
-    updateGUISignal = QtCore.pyqtSignal()
-        
-    def __init__(self, inQueue, outQueue):
+    def __repr__(self):
+        base_repr = super().__repr__()
+        return f"{base_repr}, star_name={self.star_name}"
+
+    def __str__(self):
+        base_str = super().__str__()
+        return f"{base_str}, star_name={self.star_name}"
+
+    def __getitem__(self, item):
+        sliced_obj = super().__getitem__(item)
+        if isinstance(sliced_obj, SkyCoord):
+            return NamedSkyCoord(sliced_obj, star_name=self.star_name[item])
+        return sliced_obj
+
+class database_worker(QtCore.QObject):
+    VPM_fetched_signal = QtCore.pyqtSignal(dict)
+    star_field_signal = QtCore.pyqtSignal(list)
+    start_querying_VPM_signal = QtCore.pyqtSignal()
+    stop_querying_VPM_signal = QtCore.pyqtSignal()
+    query_timeout_signal = QtCore.pyqtSignal()
+    query_run_number_signal = QtCore.pyqtSignal(int)
+
+
+    def __init__(self):
         super().__init__()
-        self.inQueue = inQueue
-        self.outQueue = outQueue
+        self.vpm_timer = QtCore.QTimer()
+        self.vpm_timer.timeout.connect(self.get_stars_in_fov)
+        self.running = False
+        self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
+        self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
+        with open('/home/zdhughes/VERITAS_optical/data/asu2.dat', 'r') as f:
+            lines = [x for x in f]
+        star_names = np.array([x.split()[0] for x in lines])
+        star_RA_deg = np.array([le(x.split()[1]) for x in lines])
+        star_DEC_deg = np.array([le(x.split()[2]) for x in lines])
+        self.stars = SkyCoord(ra=star_RA_deg*u.deg, dec=star_DEC_deg*u.deg)
 
-    def setupThread(self):
-        self.bind(QHostAddress.SpecialAddress.LocalHost, 31255)
-        self.readyRead.connect(self.getDatagramAndQueue)
-        #self.readyRead.connect(self.readPendingDatagrams)
+        # Database configuration
+        self.db_config = {
+            'host': 'romulus.ucsc.edu',
+            'db': 'VERITAS',
+            'user': 'readonly',
+            'cursorclass': pymysql.cursors.DictCursor,
+            'charset' : 'utf8'
+        }
 
-    def getDatagramAndQueue(self):
-        datagram = self.receiveDatagram(65507)
-        pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
-        self.pixelData = pixelData
-        self.updateGUISignal.emit()
+        # Create the database connection and cursor
+        self.dbcnx = pymysql.connect(**self.db_config)
+        self.crs = self.dbcnx.cursor()
 
-    def readPendingDatagrams(self):
-        #print("Reading pending datagrams")
-        newestPixelBytes = None
-        while self.hasPendingDatagrams():
-            datagram = self.receiveDatagram()
-            newestPixelBytes = datagram.data()
-        if newestPixelBytes:
-            self.handlePixelData(newestPixelBytes)
 
-    def handlePixelData(self, pixelBytes):
-        # Convert newestData to a 2000-element float32 NumPy array
-        pixelData = np.frombuffer(pixelBytes, dtype=np.float32)
-        self.outQueue.put(pixelData)
-        self.updateGUISignal.emit()
+        #self.timer.start(1000)  # Query every 1 second
+        self.start_querying_VPM_signal.connect(self.startTimer)
+        self.stop_querying_VPM_signal.connect(self.stopTimer)
+
+
+    def startTimer(self):
+        self.vpm_timer.start(1000)  # Query every 1 second
+
+    def stopTimer(self):
+        self.vpm_timer.stop()
+
+    def query_last_run_number(self):
+        # Query the last run number from the database
+        query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
+        self.fetch_data(query)
+
+    def get_stars_in_fov(self):
+
+        def calculate_star_offsets(telescope):
+            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.deg, az=vpm[telescope]['azimuth_raw']*u.deg, location=self.basecamp, obstime=current_time, frame='altaz')
+            seperation = current_pointing.separation(stars_altaz)
+            stars_in_fov = stars_altaz[seperation < 3.75*u.deg]
+            dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
+
+            #print(current_pointing)
+            #print(stars_in_fov)
+
+
+            # Convert the angles to decimal degrees
+            dazs_deg = dazs.degree
+            dalts_deg = dalts.degree
+
+            stars = list(zip(dalts_deg, dazs_deg))
+            #print(stars)
+
+            return stars
+
+
+        current_time = Time.now()
+        star_positions = []
+        vpm = self.query_last_pointing()
+        stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
+
+        # Telescope 1
+        t1_stars = calculate_star_offsets('t1')
+        star_positions.append(t1_stars)
+
+        # Telescope 2
+        t2_stars = calculate_star_offsets('t2')
+        star_positions.append(t2_stars)
+
+        # Telescope 3
+        t3_stars = calculate_star_offsets('t3')
+        star_positions.append(t3_stars)
+
+        # Telescope 4
+        t4_stars = calculate_star_offsets('t4')
+        star_positions.append(t4_stars)
+
+        self.star_field_signal.emit(star_positions)
+
+        return
+
+
+
+
+    def query_last_pointing(self):
+        vpm = {}
+        # Query the last pointing from the database
+        query_t1 = 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope0_Status ORDER BY timestamp DESC LIMIT 1'
+        res = self.fetch_data(query_t1)
+        vpm['t1'] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
+
+        query_t2 = 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope1_Status ORDER BY timestamp DESC LIMIT 1'
+        res = self.fetch_data(query_t2)
+        vpm['t2'] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
+
+        query_t3 = 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope2_Status ORDER BY timestamp DESC LIMIT 1'
+        res = self.fetch_data(query_t3)
+        vpm['t3'] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
+
+        query_t4 = 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope3_Status ORDER BY timestamp DESC LIMIT 1'
+        res = self.fetch_data(query_t4)
+        vpm['t4'] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
+
+        self.VPM_fetched_signal.emit(vpm)
+
+        return vpm
+
+
+    def fetch_data(self, query):
+        try:
+            self.crs.execute(query)
+            res = self.crs.fetchone()
+            if res:
+                return res
+        except Exception as e:
+            print(f"Error querying database: {e}")
+
+    def stop(self):
+        self.vpm_timer.stop()
 
 
 
 class Window(QtWidgets.QMainWindow, Ui_MainWindow):
+
+    startWorkerSignal = QtCore.pyqtSignal()
+    stopWorkerSignal = QtCore.pyqtSignal()
     
     '''This is the main application window.'''
     COLORS = {
@@ -141,10 +254,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         logger.addHandler(self.logHandler)
         self.logHandler.setLevel('INFO')
 
+        self.actionExit.triggered.connect(self.close)
+
         self.starPos = [(0,0)]
-        self.starScatters = None
+        self.star_field = None
+
         self.weights = np.zeros(499)
-        self.hexSize = 14.0
+        self.hexSize = 13
         self.cameraView.ci.setBorder((50, 50, 100))
         self.w1 = self.cameraView.addViewBox(enableMouse=False)
         self.w2 = self.cameraView.addViewBox(enableMouse=False)
@@ -154,6 +270,16 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.cameraView.nextRow()
         self.w5 = self.cameraView.addPlot(colspan=2)
         self.ws = [self.w1, self.w2, self.w3, self.w4, self.w5]
+
+        # Example values for zooming in
+        xmin, xmax = -1.85, 1.85
+        ymin, ymax = -1.865, 1.865
+
+        # Set the range for each ViewBox
+        self.w1.setRange(xRange=[xmin, xmax], yRange=[ymin, ymax])
+        self.w2.setRange(xRange=[xmin, xmax], yRange=[ymin, ymax])
+        self.w3.setRange(xRange=[xmin, xmax], yRange=[ymin, ymax])
+        self.w4.setRange(xRange=[xmin, xmax], yRange=[ymin, ymax])
 
         self.w1.setAspectLocked()
         self.w2.setAspectLocked()
@@ -169,13 +295,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #self.nPts = 255
         self.nPts = 255
         self.ptr1 = 0
-        self.colormap = pg.colormap.get('CET-L6')
+        self.colormap = pg.colormap.get('CET-CBL2')
         self.valueRange = np.linspace(0, 66000, num=self.nPts)
         #self.valueRange = np.linspace(0, 255, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
-        print(self.colors2)
-        print(self.valueRange)
         
         self.pixelTimeSeriesData1 = np.zeros(1000)
         self.pixelTimeSeriesData2 = np.zeros(1000)
@@ -190,15 +314,19 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.w5.addItem(self.pixelTimeSeriesDataCurve3)
         self.w5.addItem(self.pixelTimeSeriesDataCurve4)
 
-        self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=(40,90))
-        self.roi2 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=(40,90))
-        self.roi3 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=(40,90))
-        self.roi4 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=(40,90))
+        thick_pen = pg.mkPen((255, 0, 0), width=3)
+        self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, handlePen=thick_pen)
+        self.roi2 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, movable=False, resizable=False)
+        self.roi3 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, movable=False, resizable=False)
+        self.roi4 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, movable=False, resizable=False)
         self.rois = [self.roi1, self.roi2, self.roi3, self.roi4]
         self.w1.addItem(self.roi1)
         self.w2.addItem(self.roi2)
         self.w3.addItem(self.roi3)
         self.w4.addItem(self.roi4)
+        self.roi2.removeHandle(0)
+        self.roi3.removeHandle(0)
+        self.roi4.removeHandle(0)
         self.selected = np.zeros(1, dtype=int)
 
         self.pixelData = np.zeros(2000) # Initialize the pixel data array.
@@ -214,6 +342,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.w4.disableAutoRange()
         #w5.disableAutoRange(axis=0)
 
+
         self.roi1.sigRegionChanged.connect(self.updateROI)
         
         self.updateROI(self.roi1)
@@ -222,26 +351,80 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.StopButton.clicked.connect(self.stopRun)
         self.s1.scene().sigMouseMoved.connect(self.onMouseMoved)
 
-        # listenIP = QHostAddress("127.0.0.1:31255")
-        # self.listenInQueue = queue.Queue()
-        # self.listenOutQueue = queue.Queue()
-        # self.listenSocket = ListenSocket(self.listenInQueue, self.listenOutQueue)
-        # self.listenSocket.bind(QHostAddress.SpecialAddress.LocalHost, 31255)
-        # self.listenThread = QtCore.QThread()
-        # self.listenSocket.moveToThread(self.listenThread)
-        # self.listenSocket.readyRead.connect(self.listenSocket.getDatagramAndQueue)
-        # self.listenSocket.updateGUISignal.connect(self.update)
-        # self.listenThread.start()
 
         self.listenSocket = QUdpSocket()
         self.listenSocket.bind(QHostAddress.SpecialAddress.LocalHost, 31255)
         self.listenSocket.readyRead.connect(self.getDatagramAndQueue)
 
-        #self.timer = QtCore.QTimer()
-        #self.timer.timeout.connect(self.update)
-        #self.timer.start(0)
 
-        #self.update()
+
+
+        # Create the worker and thread
+        self.db_worker = database_worker()
+        self.db_thread = QtCore.QThread()
+
+        # Move the worker to the thread
+        self.db_worker.moveToThread(self.db_thread)
+
+        # Connect signals and slots
+        #self.db_thread.started.connect(self.db_worker.startTimer)
+        #self.db_worker.VPM_fetched_signal.connect(self.handle_new_data)
+        #self.db_worker.star_field_signal.connect(self.draw_star_field)
+        self.startWorkerSignal.connect(self.db_worker.start_querying_VPM_signal)
+        self.stopWorkerSignal.connect(self.db_worker.stop_querying_VPM_signal)
+
+        # Start the thread
+        self.db_thread.start()
+        self.startWorkerSignal.emit()
+        #self.startWorkerSignal.connect(self.db_worker.stopTimer)
+        #self.testTimer = QtCore.QTimer()
+        #self.testTimer.timeout.connect(self.stopWorker)
+        #self.testTimer.start(5000)
+
+    def stopWorker(self):
+        self.startWorkerSignal.emit()
+
+    def handle_VPM_data(self, vpm):
+
+        # Handle the new data fetched from the database
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        print_string = '\n'
+        for key, value in vpm.items():
+            print_string += f"Telescope {key} - Elevation: {value['elevation_raw']}, Azimuth: {value['azimuth_raw']}\n"
+        logger.log(logging.INFO, print_string, extra=extra)
+
+    def handle_star_field_data(self, star_positions):
+
+        # Handle the new data fetched from the database
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        print_string = '\n'
+        for i, telescope in enumerate(star_positions):
+            print_string += f"Telescope {i+1} - Stars in FOV: {len(telescope)}\n"
+            for star in telescope:
+                print_string += f"Star: {star}\n"
+        logger.log(logging.INFO, print_string, extra=extra)
+
+
+
+    def draw_star_field(self, star_positions):
+        if self.star_field is not None:
+            for i in range(4):
+                self.ws[i].removeItem(self.star_field[i])
+                #self.ws[i].clear()
+        for i, telescope in enumerate(star_positions):
+            xs, ys = list(zip(*telescope))
+            self.star_field = pg.ScatterPlotItem(
+                x=xs,
+                y=ys,
+                brush=pg.mkColor('r'),
+                pxMode=True,  # Set pxMode=False to allow spots to transform with the view
+                hoverable=False,
+                useCache=True,
+                antialias=False,
+            )
+            self.ws[i].addItem(self.star_field)
+        return
+
 
     def getDatagramAndQueue(self):
         datagram = self.listenSocket.receiveDatagram(8000)
@@ -368,9 +551,15 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
     #, 'pen': {'color': 'w', 'width': 0.1}
         return w, s, spots, xs, ys, labels
 
+def load_stylesheet(app, qss_file):
+    with open(qss_file, "r") as file:
+        app.setStyleSheet(file.read())
+
+if __name__ == "__main__":
         
-QtCore.QThread.currentThread().setObjectName('MainThread')
-app = QtWidgets.QApplication(sys.argv)
-window = Window()
-window.show()
-sys.exit(app.exec())
+    QtCore.QThread.currentThread().setObjectName('MainThread')
+    app = QtWidgets.QApplication(sys.argv)
+    window = Window()
+    load_stylesheet(app, "Genetive.qss")
+    window.show()
+    sys.exit(app.exec())
