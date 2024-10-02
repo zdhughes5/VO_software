@@ -33,6 +33,8 @@ from astropy.time import Time
 from astropy import units as u
 import astroplan as apl
 import time
+from multiprocessing import Process, Queue
+from db_worker_process import query_last_pointing
 
 
 
@@ -108,41 +110,61 @@ class database_worker(QtCore.QObject):
             'db': 'VERITAS',
             'user': 'readonly',
             'cursorclass': pymysql.cursors.DictCursor,
-            'charset' : 'utf8'
+            'charset': 'utf8'
         }
 
-        # Create the database connection and cursor
-        self.dbcnx = pymysql.connect(**self.db_config)
-        self.crs = self.dbcnx.cursor()
+        self.queue = Queue(maxsize=1)
+        self.process = None
 
-        self.start_querying_VPM_signal.connect(self.startTimer)
-        self.stop_querying_VPM_signal.connect(self.stopTimer)
+        self.start_querying_VPM_signal.connect(self.start_querying)
+        self.stop_querying_VPM_signal.connect(self.stop_querying)
 
-    def startTimer(self):
-        self.vpm_timer.start(1000)  # Query every 1 second
+    def start_querying(self):
+        if self.process is not None:
+            self.stop_querying()
+        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config))
+        self.process.start()
+        self.vpm_timer.start(1000)  # Check the queue every 1 second
 
-    def stopTimer(self):
+    def stop_querying(self):
+        if self.process is not None:
+            self.process.terminate()
+            self.process.join()
+            self.process = None
         self.vpm_timer.stop()
 
-    def query_last_pointing(self):
+    def get_stars_in_fov(self):
+        if not self.queue.empty():
+            vpm = self.queue.get()
+            self.VPM_fetched_signal.emit(vpm)
+            self.calculate_star_offsets(vpm)
+
+    def calculate_star_offsets(self, vpm):
+        current_time = Time.now()
+        stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
+        star_positions = []
+
+        for telescope in ['t1', 't2', 't3', 't4']:
+            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.deg, az=vpm[telescope]['azimuth_raw']*u.deg, location=self.basecamp, obstime=current_time, frame='altaz')
+            separation = current_pointing.separation(stars_altaz)
+            stars_in_fov = stars_altaz[separation < 1.75*u.deg]
+            dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
+            dazs_deg = dazs.degree
+            dalts_deg = dalts.degree
+            stars = list(zip(dalts_deg, dazs_deg))
+            star_positions.append(stars)
+
+        self.star_field_signal.emit(star_positions)
+
+    def stop(self):
+        self.stop_querying()
+
+    def query_last_run_number(self):
         start_time = time.time()
-        vpm = {}
-        queries = {
-            't1': 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope0_Status ORDER BY timestamp DESC LIMIT 1',
-            't2': 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope1_Status ORDER BY timestamp DESC LIMIT 1',
-            't3': 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope2_Status ORDER BY timestamp DESC LIMIT 1',
-            't4': 'SELECT elevation_raw, azimuth_raw FROM tblPositioner_Telescope3_Status ORDER BY timestamp DESC LIMIT 1'
-        }
-        for telescope, query in queries.items():
-            query_start_time = time.time()
-            res = self.fetch_data(query)
-            query_elapsed_time = time.time() - query_start_time
-            #print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
-            vpm[telescope] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
-        self.VPM_fetched_signal.emit(vpm)
-        total_elapsed_time = time.time() - start_time
-        #print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
-        return vpm
+        query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
+        self.fetch_data(query)
+        elapsed_time = time.time() - start_time
+        print(f"query_last_run_number took {elapsed_time:.4f} seconds")
 
     def fetch_data(self, query):
         start_time = time.time()
@@ -154,45 +176,7 @@ class database_worker(QtCore.QObject):
         except Exception as e:
             print(f"Error querying database: {e}")
         elapsed_time = time.time() - start_time
-        #print(f"fetch_data took {elapsed_time:.4f} seconds")
-
-    def get_stars_in_fov(self):
-        start_time = time.time()
-        def calculate_star_offsets(telescope):
-            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.deg, az=vpm[telescope]['azimuth_raw']*u.deg, location=self.basecamp, obstime=current_time, frame='altaz')
-            separation = current_pointing.separation(stars_altaz)
-            stars_in_fov = stars_altaz[separation < 1.75*u.deg]
-            dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
-            dazs_deg = dazs.degree
-            dalts_deg = dalts.degree
-            stars = list(zip(dalts_deg, dazs_deg))
-            return stars
-
-        current_time = Time.now()
-        star_positions = []
-        vpm = self.query_last_pointing()
-        stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
-
-        for telescope in ['t1', 't2', 't3', 't4']:
-            star_start_time = time.time()
-            star_positions.append(calculate_star_offsets(telescope))
-            star_elapsed_time = time.time() - star_start_time
-            #print(f"Calculating star offsets for {telescope} took {star_elapsed_time:.4f} seconds")
-
-        #print(star_positions)
-        self.star_field_signal.emit(star_positions)
-        total_elapsed_time = time.time() - start_time
-        #print(f"Total get_stars_in_fov took {total_elapsed_time:.4f} seconds")
-
-    def stop(self):
-        self.vpm_timer.stop()
-
-    def query_last_run_number(self):
-        start_time = time.time()
-        query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
-        self.fetch_data(query)
-        elapsed_time = time.time() - start_time
-        #print(f"query_last_run_number took {elapsed_time:.4f} seconds")
+        print(f"fetch_data took {elapsed_time:.4f} seconds")
 
 
 
@@ -343,22 +327,26 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.db_worker.moveToThread(self.db_thread)
 
         # Connect signals and slots
-        #self.db_thread.started.connect(self.db_worker.startTimer)
-        #self.db_worker.VPM_fetched_signal.connect(self.handle_new_data)
-        self.db_worker.star_field_signal.connect(self.draw_star_field)
         self.startWorkerSignal.connect(self.db_worker.start_querying_VPM_signal)
         self.stopWorkerSignal.connect(self.db_worker.stop_querying_VPM_signal)
+        self.db_worker.VPM_fetched_signal.connect(self.handle_VPM_data)
+        self.db_worker.star_field_signal.connect(self.draw_star_field)
+
+
 
         # Start the thread
         self.db_thread.start()
         self.startWorkerSignal.emit()
-        #self.startWorkerSignal.connect(self.db_worker.stopTimer)
-        #self.testTimer = QtCore.QTimer()
-        #self.testTimer.timeout.connect(self.stopWorker)
-        #self.testTimer.start(5000)
+
 
     def stopWorker(self):
-        self.startWorkerSignal.emit()
+        self.stopWorkerSignal.emit()
+        self.db_thread.quit()
+        self.db_thread.wait()
+
+    def closeEvent(self, event):
+        self.stopWorker()
+        event.accept()
 
     def handle_VPM_data(self, vpm):
 
