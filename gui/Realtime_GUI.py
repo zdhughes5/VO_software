@@ -137,11 +137,11 @@ class database_worker(QtCore.QObject):
             query_start_time = time.time()
             res = self.fetch_data(query)
             query_elapsed_time = time.time() - query_start_time
-            print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
+            #print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
             vpm[telescope] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
         self.VPM_fetched_signal.emit(vpm)
         total_elapsed_time = time.time() - start_time
-        print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
+        #print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
         return vpm
 
     def fetch_data(self, query):
@@ -154,14 +154,14 @@ class database_worker(QtCore.QObject):
         except Exception as e:
             print(f"Error querying database: {e}")
         elapsed_time = time.time() - start_time
-        print(f"fetch_data took {elapsed_time:.4f} seconds")
+        #print(f"fetch_data took {elapsed_time:.4f} seconds")
 
     def get_stars_in_fov(self):
         start_time = time.time()
         def calculate_star_offsets(telescope):
             current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.deg, az=vpm[telescope]['azimuth_raw']*u.deg, location=self.basecamp, obstime=current_time, frame='altaz')
             separation = current_pointing.separation(stars_altaz)
-            stars_in_fov = stars_altaz[separation < 3.75*u.deg]
+            stars_in_fov = stars_altaz[separation < 1.75*u.deg]
             dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
             dazs_deg = dazs.degree
             dalts_deg = dalts.degree
@@ -177,11 +177,12 @@ class database_worker(QtCore.QObject):
             star_start_time = time.time()
             star_positions.append(calculate_star_offsets(telescope))
             star_elapsed_time = time.time() - star_start_time
-            print(f"Calculating star offsets for {telescope} took {star_elapsed_time:.4f} seconds")
+            #print(f"Calculating star offsets for {telescope} took {star_elapsed_time:.4f} seconds")
 
+        #print(star_positions)
         self.star_field_signal.emit(star_positions)
         total_elapsed_time = time.time() - start_time
-        print(f"Total get_stars_in_fov took {total_elapsed_time:.4f} seconds")
+        #print(f"Total get_stars_in_fov took {total_elapsed_time:.4f} seconds")
 
     def stop(self):
         self.vpm_timer.stop()
@@ -191,7 +192,7 @@ class database_worker(QtCore.QObject):
         query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
         self.fetch_data(query)
         elapsed_time = time.time() - start_time
-        print(f"query_last_run_number took {elapsed_time:.4f} seconds")
+        #print(f"query_last_run_number took {elapsed_time:.4f} seconds")
 
 
 
@@ -232,7 +233,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.actionExit.triggered.connect(self.close)
 
         self.starPos = [(0,0)]
-        self.star_field = None
+        self.star_field = [None, None, None, None]
 
         self.weights = np.zeros(499)
         self.hexSize = 13
@@ -344,7 +345,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         # Connect signals and slots
         #self.db_thread.started.connect(self.db_worker.startTimer)
         #self.db_worker.VPM_fetched_signal.connect(self.handle_new_data)
-        #self.db_worker.star_field_signal.connect(self.draw_star_field)
+        self.db_worker.star_field_signal.connect(self.draw_star_field)
         self.startWorkerSignal.connect(self.db_worker.start_querying_VPM_signal)
         self.stopWorkerSignal.connect(self.db_worker.stop_querying_VPM_signal)
 
@@ -381,23 +382,33 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
 
-    def draw_star_field(self, star_positions):
-        if self.star_field is not None:
-            for i in range(4):
+    def draw_star_field(self, array_star_positions):
+        print("self.star_field", self.star_field)
+        print("star_positions", array_star_positions)
+        for i in range(4):
+            if self.star_field[i] is not None:
                 self.ws[i].removeItem(self.star_field[i])
                 #self.ws[i].clear()
-        for i, telescope in enumerate(star_positions):
-            xs, ys = list(zip(*telescope))
-            self.star_field = pg.ScatterPlotItem(
-                x=xs,
-                y=ys,
-                brush=pg.mkColor('r'),
-                pxMode=True,  # Set pxMode=False to allow spots to transform with the view
-                hoverable=False,
-                useCache=True,
-                antialias=False,
-            )
-            self.ws[i].addItem(self.star_field)
+        self.star_field = [None, None, None, None]
+        for i, star_positions in enumerate(array_star_positions):
+            if len(star_positions) > 0:
+                xs, ys = list(zip(*star_positions))
+                print("telescope", i)
+                print("xys", xs, ys)
+                scatter_plot = pg.ScatterPlotItem(
+                    x=xs,
+                    y=ys,
+                    brush=pg.mkColor('r'),
+                    size=10,
+                    pxMode=True,  # Set pxMode=False to allow spots to transform with the view
+                    hoverable=False,
+                    useCache=True,
+                    antialias=False,
+                )
+                self.star_field[i] = scatter_plot
+                self.ws[i].addItem(scatter_plot)
+            else:
+                self.star_field[i] = None
         return
 
 
