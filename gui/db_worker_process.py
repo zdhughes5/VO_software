@@ -20,19 +20,19 @@ def query_last_pointing(queue: Queue, db_config: dict):
             crs.execute(query)
             res = crs.fetchone()
             query_elapsed_time = time.time() - query_start_time
-            print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
+            #print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
             vpm[telescope] = {'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
         total_elapsed_time = time.time() - start_time
-        print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
+        #print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
         
         if not queue.full():
             queue.put(vpm)
         else:
             queue.get()
             queue.put(vpm)
-            
+
         # Can I not close the cursor and connection here?
         crs.close()
         dbcnx.close()
         
-        time.sleep(1)  # Query every 1 second
+        time.sleep(2.5)  # Query every 1 second

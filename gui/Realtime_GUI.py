@@ -17,7 +17,7 @@ Created on Tue Oct 11 20:54:47 2022
 from GUI import Ui_MainWindow
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from time import perf_counter
 from pyqtgraph.Qt.QtGui import QBrush, QColor
 from ast import literal_eval as  le
@@ -84,11 +84,13 @@ class NamedSkyCoord(SkyCoord):
 
 class database_worker(QtCore.QObject):
     VPM_fetched_signal = QtCore.pyqtSignal(dict)
-    star_field_signal = QtCore.pyqtSignal(list)
+    star_field_signal = QtCore.pyqtSignal(dict)
     start_querying_VPM_signal = QtCore.pyqtSignal()
     stop_querying_VPM_signal = QtCore.pyqtSignal()
     query_timeout_signal = QtCore.pyqtSignal()
     query_run_number_signal = QtCore.pyqtSignal(int)
+    query_timeout_signal = QtCore.pyqtSignal()
+    query_ok_signal = QtCore.pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -99,10 +101,13 @@ class database_worker(QtCore.QObject):
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
         with open('/home/zdhughes/VERITAS_optical/data/asu2.dat', 'r') as f:
             lines = [x for x in f]
-        star_names = np.array([x.split()[0] for x in lines])
+        self.star_names = np.array([x.split()[0] for x in lines])
         star_RA_deg = np.array([float(x.split()[1]) for x in lines])
         star_DEC_deg = np.array([float(x.split()[2]) for x in lines])
         self.stars = SkyCoord(ra=star_RA_deg*u.deg, dec=star_DEC_deg*u.deg)
+        self.queue_check_counter = 0
+        self.queue_check_interval = 2.5
+        self.maximum_queue_checks = 5
 
         # Database configuration
         self.db_config = {
@@ -124,7 +129,7 @@ class database_worker(QtCore.QObject):
             self.stop_querying()
         self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config))
         self.process.start()
-        self.vpm_timer.start(1000)  # Check the queue every 1 second
+        self.vpm_timer.start(int(self.queue_check_interval*1000))  # Check the queue every 2.5 seconds
 
     def stop_querying(self):
         if self.process is not None:
@@ -138,23 +143,35 @@ class database_worker(QtCore.QObject):
             vpm = self.queue.get()
             self.VPM_fetched_signal.emit(vpm)
             self.calculate_star_offsets(vpm)
+            self.query_ok_signal.emit()
+            self.queue_check_counter = 0
+        else:
+            self.queue_check_counter += 1
+            if self.queue_check_counter >= self.maximum_queue_checks:
+                self.query_timeout_signal.emit()
 
     def calculate_star_offsets(self, vpm):
         current_time = Time.now()
         stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
-        star_positions = []
+        star_field_data = {}
+        star_offsets = []
+        star_offsets_labels = []
 
         for telescope in ['t1', 't2', 't3', 't4']:
-            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.deg, az=vpm[telescope]['azimuth_raw']*u.deg, location=self.basecamp, obstime=current_time, frame='altaz')
+            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.rad, az=vpm[telescope]['azimuth_raw']*u.rad, location=self.basecamp, obstime=current_time, frame='altaz')
             separation = current_pointing.separation(stars_altaz)
-            stars_in_fov = stars_altaz[separation < 1.75*u.deg]
+            stars_in_fov = stars_altaz[separation < 2*u.deg]
             dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
             dazs_deg = dazs.degree
             dalts_deg = dalts.degree
-            stars = list(zip(dalts_deg, dazs_deg))
-            star_positions.append(stars)
+            stars_offsets_in_fov = list(zip(dalts_deg, dazs_deg))
+            star_offsets_labels_in_fov = self.star_names[separation < 2*u.deg]
+            star_offsets.append(stars_offsets_in_fov)
+            star_offsets_labels.append(star_offsets_labels_in_fov)
+        star_field_data['offsets'] = star_offsets
+        star_field_data['labels'] = star_offsets_labels
 
-        self.star_field_signal.emit(star_positions)
+        self.star_field_signal.emit(star_field_data)
 
     def stop(self):
         self.stop_querying()
@@ -218,6 +235,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.starPos = [(0,0)]
         self.star_field = [None, None, None, None]
+        self.star_field_labels = [None, None, None, None]
 
         self.weights = np.zeros(499)
         self.hexSize = 13
@@ -370,33 +388,55 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
 
-    def draw_star_field(self, array_star_positions):
-        print("self.star_field", self.star_field)
-        print("star_positions", array_star_positions)
+    def draw_star_field(self, star_field_data):
+        #print("self.star_field", self.star_field)
+        #print("star_positions", array_star_positions)
+        array_star_positions = star_field_data['offsets']
+        array_star_labels = star_field_data['labels']
+        #print(self.star_field_labels)
         for i in range(4):
             if self.star_field[i] is not None:
                 self.ws[i].removeItem(self.star_field[i])
-                #self.ws[i].clear()
+            if self.star_field_labels[i] is not None:
+                for text_item in self.star_field_labels[i]:
+                    self.ws[i].removeItem(text_item)
         self.star_field = [None, None, None, None]
+        self.star_field_labels = [None, None, None, None]
+        border_pen = pg.mkPen(color='k', width=1)  # Black border with width 1
         for i, star_positions in enumerate(array_star_positions):
             if len(star_positions) > 0:
                 xs, ys = list(zip(*star_positions))
-                print("telescope", i)
-                print("xys", xs, ys)
+                #print("telescope", i)
+                #print("xys", xs, ys)
                 scatter_plot = pg.ScatterPlotItem(
                     x=xs,
                     y=ys,
                     brush=pg.mkColor('r'),
-                    size=10,
+                    size=20,
+                    pen=border_pen,
+                    hoverSize=25,
+                    symbol='star',
                     pxMode=True,  # Set pxMode=False to allow spots to transform with the view
-                    hoverable=False,
+                    hoverable=True,
                     useCache=True,
                     antialias=False,
+                    data=array_star_labels[i]
                 )
                 self.star_field[i] = scatter_plot
                 self.ws[i].addItem(scatter_plot)
+                font = QtGui.QFont()
+                font.setPointSize(8)  # Set the font size to 12
+                font.setBold(True)
+                for j, point in enumerate(scatter_plot.points()):
+                    x, y = point.pos()
+                    text_item = pg.TextItem(text=array_star_labels[i][j], anchor=(0, 0.75))
+                    text_item.setParentItem(scatter_plot)
+                    text_item.setPos(x, y)
+                    text_item.setFont(font)
+
             else:
                 self.star_field[i] = None
+                self.star_field_labels[i] = None
         return
 
 
@@ -426,6 +466,20 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.s2.setBrush(self.brushes2)
         self.s3.setBrush(self.brushes3)
         self.s4.setBrush(self.brushes4)
+
+        #print(help(self.s1.points()[0]))
+
+        # Update data attribute of each point
+        #for i, point in enumerate(self.s1.points()):
+        #   point.setData(self.pixelData[i])
+        #for i, point in enumerate(self.s2.points()):
+        #    point.data = self.pixelData[500 + i]
+        #for i, point in enumerate(self.s3.points()):
+        #    point.data = self.pixelData[1000 + i]
+        #for i, point in enumerate(self.s4.points()):
+        #    point.data = self.pixelData[1500 + i]
+
+        #self.s1.data = self.pixelData[:499]
 
         self.pixelTimeSeriesData1 = np.roll(self.pixelTimeSeriesData1, -1)
         self.pixelTimeSeriesData2 = np.roll(self.pixelTimeSeriesData2, -1)
@@ -489,7 +543,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         # Get list of all points inside shape
         self.selectedHold = np.array([i for i, pt in enumerate(self.points) if self.roiShape.contains(QtCore.QPointF(pt[0], pt[1]))])
         if np.array_equal(self.selectedHold, self.selected) is False:
-            self.PMTLine.setText(",".join(np.char.mod('%d', self.selectedHold)))
+            self.data_display_pmt_line.setText(",".join(np.char.mod('%d', self.selectedHold)))
             logger.log(logging.DEBUG, 'New PMTs selected: ' + ",".join(np.char.mod('%d', self.selectedHold)), extra=extra)
             self.selected = self.selectedHold
 
@@ -501,6 +555,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         s = pg.ScatterPlotItem(
                pxMode=True,  # Set pxMode=False to allow spots to transform with the view
                hoverable=True,
+               brush=pg.mkColor('b'),
                hoverPen=pg.mkPen('g'),
                hoverSize=self.hexSize,
                useCache=True,
@@ -519,7 +574,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #xs, ys, labels = drawHexGridLoop2((0, 0), 14, 5, 0)
     
         for i, thing in enumerate(xs):
-            spots.append({'pos': (xs[i], ys[i]), 'size': self.hexSize, 'brush':pg.intColor(10, 10), 'symbol':'h'})
+            spots.append({'pos': (xs[i], ys[i]), 'size': self.hexSize, 'brush':pg.intColor(10, 10), 'symbol':'h', 'data':'Pixel ' + str(labels[i])})
         s.addPoints(spots)
         w.addItem(s)
     #, 'pen': {'color': 'w', 'width': 0.1}
@@ -534,6 +589,6 @@ if __name__ == "__main__":
     QtCore.QThread.currentThread().setObjectName('MainThread')
     app = QtWidgets.QApplication(sys.argv)
     window = Window()
-    load_stylesheet(app, "Genetive.qss")
+    #load_stylesheet(app, "Genetive.qss")
     window.show()
     sys.exit(app.exec())
