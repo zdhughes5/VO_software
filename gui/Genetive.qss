@@ -20,6 +20,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+QPlainTextEdit#log_edit {
+    color: white;  /* Set text color to white */
+    background-color: #1b1b1b;  /* Optional: Set background color */
+	font-weight: bold;
+}
+
+/* Specific style for StartButton */
+QPushButton#StartButton {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(0, 170, 0);
+}
+
+/* Specific style for StopButton */
+QPushButton#StopButton {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(170, 0, 0);
+}
+
 /*-----QWidget-----*/
 QWidget
 {
@@ -36,8 +56,8 @@ QLabel
 {
 	background-color: transparent;
 	color: #ff732d;
-	/*font-weight: bold;
-	font-size: 10px;*/
+	font-weight: bold;
+	/*font-size: 10px;*/
 
 }
 
@@ -163,7 +183,7 @@ QTabBar::tab
 	padding-left: 15px; 
 	padding-right: 15px; 
 	height: 25px;
-	width: 60px;
+	/*width: 60px;*/
 }
 
 
@@ -478,7 +498,7 @@ QComboBox::drop-down
 
 QComboBox::down-arrow 
 {
-    image: url(://arrow-down.png);
+    image: url(:/images/Ionic-Ionicons-Caret-down.png);
 	width:8px;
 	height:8px;
 
@@ -530,7 +550,7 @@ QCheckBox::indicator
 
 QCheckBox::indicator:checked
 {
-    image:url("./ressources/check.png"); /*To replace*/
+    image:url(:/images/Ionic-Ionicons-Close.png); /*To replace*/
 	background-color: #ff732d;
     border: 1px solid #ff732d;
 
@@ -609,9 +629,9 @@ QSpinBox::up-button:pressed
 
 QSpinBox::up-arrow 
 {
-    image: url(://arrow-up.png);
-    width: 7px;
-    height: 7px;
+    image: url(:/images/Ionic-Ionicons-Caret-up.png);
+    width: 10px;
+    height: 10px;
 
 }
 
@@ -643,9 +663,9 @@ QSpinBox::down-button:pressed
 
 QSpinBox::down-arrow 
 {
-    image: url(://arrow-down.png);
-    width: 7px;
-    height: 7px;
+    image: url(:/images/Ionic-Ionicons-Caret-down.png);
+    width: 10px;
+    height: 10px;
 
 }
 

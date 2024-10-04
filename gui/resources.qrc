@@ -1,1 +1,9 @@
- 
+ <RCC>
+    <qresource prefix="/">
+        <file>images/down-arrow.png</file>
+        <file>images/up-arrow.png</file>
+        <file>images/Ionic-Ionicons-Caret-down.png</file>
+        <file>images/Ionic-Ionicons-Caret-up.png</file>
+        <file>images/Ionic-Ionicons-Close.png</file>
+    </qresource>
+</RCC>

@@ -35,11 +35,14 @@ import astroplan as apl
 import time
 from multiprocessing import Process, Queue
 from db_worker_process import query_last_pointing
+import json
+import resources_rc
 
 
 
 fs = '[%(asctime)s %(levelname)s] %(message)s'
 formatter = logging.Formatter(fs)
+#ogging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
 logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -138,6 +141,7 @@ class database_worker(QtCore.QObject):
             self.process = None
         self.vpm_timer.stop()
 
+
     def get_stars_in_fov(self):
         if not self.queue.empty():
             vpm = self.queue.get()
@@ -148,7 +152,11 @@ class database_worker(QtCore.QObject):
         else:
             self.queue_check_counter += 1
             if self.queue_check_counter >= self.maximum_queue_checks:
+                extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
                 self.query_timeout_signal.emit()
+                if self.queue_check_counter % self.maximum_queue_checks == 0:
+                    logger.log(logging.WARNING, "Haven't got pointing from VERITAS MySQL DB worker in %d seconds" % (self.queue_check_counter*self.queue_check_interval), extra=extra)
+
 
     def calculate_star_offsets(self, vpm):
         current_time = Time.now()
@@ -201,6 +209,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     startWorkerSignal = QtCore.pyqtSignal()
     stopWorkerSignal = QtCore.pyqtSignal()
+    printStarFieldSignal = QtCore.pyqtSignal()
     
     '''This is the main application window.'''
     COLORS = {
@@ -224,6 +233,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         super().__init__()
         #Draw all the stuff from the UI file.
         self.setupUi(self)
+        #self.log_box.setStyleSheet("color: white; background-color: #1b1b1b; font-weight: bold;")
 
         self.logEmitter = LogSignalEmitter()
         self.logHandler = QLogHandler(self.logEmitter, self.updateLog)
@@ -350,11 +360,156 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.db_worker.VPM_fetched_signal.connect(self.handle_VPM_data)
         self.db_worker.star_field_signal.connect(self.draw_star_field)
 
+        self.actionLoad_state_file.triggered.connect(self.load_state_file)
+        self.state_edit_check.toggled.connect(self.toggle_state_edit)  # Connect the checkbox to the function
+        self.state_edit_set_button.clicked.connect(self.set_changes)
+        self.state_edit_undo_button.clicked.connect(self.undo_changes)
 
 
         # Start the thread
         self.db_thread.start()
         self.startWorkerSignal.emit()
+
+        # Connect signals to mark widgets as modified
+        self.star_field_request = False
+        self.data_display_star_field_button.clicked.connect(self.requestStarField)
+
+    def requestStarField(self):
+        self.star_field_request = True
+        
+
+    def load_state_file(self):
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load State File", "", "JSON Files (*.json);;All Files (*)")
+        if file_name:
+            with open(file_name, 'r') as file:
+                self.state_data = json.load(file)
+                self.state_data_temp = self.state_data.copy()
+                self.update_widgets_from_state()
+                self.connect_signals_to_mark_modified()
+            self.state_edit_set_button.setEnabled(True)
+            self.state_edit_undo_button.setEnabled(True)
+
+    def undo_changes(self):
+        self.update_widgets_from_state()
+        self.restore_original_colors()
+
+    def set_changes(self):
+        for i in range(4):  # Assuming there are 4 telescopes
+            telescope = self.state_data['telescopes'][i]
+            telescope['missing'] = getattr(self, f't{i+1}_state_telescope_missing_check').isChecked()
+            
+            for j in range(8):  # Assuming there are 8 harvesters per telescope
+                harvester = telescope['harvesters'][j]
+                harvester['arrayPosition'] = getattr(self, f't{i+1}_state_array_position_spin_{j+1}').value()
+                harvester['localPosition'] = getattr(self, f't{i+1}_state_local_position_spin_{j+1}').value()
+                harvester['missing'] = getattr(self, f't{i+1}_state_harvester_missing_check_{j+1}').isChecked()
+                harvester['ip'] = getattr(self, f't{i+1}_state_ip_line_{j+1}').text()
+                harvester['channel'][0] = getattr(self, f't{i+1}_state_channel_start_spin_{j+1}').value()
+                harvester['channel'][1] = getattr(self, f't{i+1}_state_channel_end_spin_{j+1}').value()
+                harvester['pixelIndex'][0] = getattr(self, f't{i+1}_state_pixel_index_start_spin_{j+1}').value()
+                harvester['pixelIndex'][1] = getattr(self, f't{i+1}_state_pixel_index_end_spin_{j+1}').value()
+        
+        self.restore_original_colors()
+        self.connect_signals_to_mark_modified()  # Reconnect signals to update original values
+                
+
+    def update_widgets_from_state(self):
+        for i in range(4):  # Assuming there are 4 telescopes
+            telescope = self.state_data['telescopes'][i]
+            getattr(self, f't{i+1}_state_telescope_missing_check').setChecked(telescope['missing'])
+            
+            for j in range(8):  # Assuming there are 8 harvesters per telescope
+                harvester = telescope['harvesters'][j]
+                getattr(self, f't{i+1}_state_array_position_spin_{j+1}').setValue(harvester['arrayPosition'])
+                getattr(self, f't{i+1}_state_local_position_spin_{j+1}').setValue(harvester['localPosition'])
+                getattr(self, f't{i+1}_state_harvester_missing_check_{j+1}').setChecked(harvester['missing'])
+                getattr(self, f't{i+1}_state_ip_line_{j+1}').setText(harvester['ip'])
+                getattr(self, f't{i+1}_state_channel_start_spin_{j+1}').setValue(harvester['channel'][0])
+                getattr(self, f't{i+1}_state_channel_end_spin_{j+1}').setValue(harvester['channel'][1])
+                getattr(self, f't{i+1}_state_pixel_index_start_spin_{j+1}').setValue(harvester['pixelIndex'][0])
+                getattr(self, f't{i+1}_state_pixel_index_end_spin_{j+1}').setValue(harvester['pixelIndex'][1])
+
+    def toggle_state_edit(self, checked):
+        for i in range(1, 5):  # Assuming there are 4 telescopes
+            getattr(self, f't{i}_state_telescope_missing_check').setEnabled(checked)
+            
+            for j in range(1, 9):  # Assuming there are 7 harvesters per telescope
+                getattr(self, f't{i}_state_array_position_spin_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_local_position_spin_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_harvester_missing_check_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_ip_line_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_channel_start_spin_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_channel_end_spin_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_pixel_index_start_spin_{j}').setEnabled(checked)
+                getattr(self, f't{i}_state_pixel_index_end_spin_{j}').setEnabled(checked)
+
+    def mark_widget_as_modified(self, widget, original_value):
+        current_value = None
+        
+        if isinstance(widget, QtWidgets.QCheckBox):
+            current_value = widget.isChecked()
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            current_value = widget.text()
+        elif isinstance(widget, QtWidgets.QSpinBox):
+            current_value = widget.value()
+        
+        if current_value == original_value:
+            if widget in self.original_styles:
+                widget.setStyleSheet(self.original_styles[widget])
+        else:
+            if not hasattr(self, 'original_styles'):
+                self.original_styles = {}
+            
+            if widget not in self.original_styles:
+                self.original_styles[widget] = widget.styleSheet()
+            
+            widget.setStyleSheet("background-color: yellow;")
+    
+    def restore_original_colors(self):
+        if hasattr(self, 'original_styles'):
+            for widget, style in self.original_styles.items():
+                widget.setStyleSheet(style)
+            self.original_styles.clear()
+
+    def connect_signals_to_mark_modified(self):
+        for i in range(1, 5):  # Assuming there are 4 telescopes
+            widget = getattr(self, f't{i}_state_telescope_missing_check')
+            original_value = self.state_data['telescopes'][i-1]['missing']
+            widget.stateChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+            
+            for j in range(1, 9):  # Assuming there are 8 harvesters per telescope
+                widget = getattr(self, f't{i}_state_array_position_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['arrayPosition']
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_local_position_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['localPosition']
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_harvester_missing_check_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['missing']
+                widget.stateChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_ip_line_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['ip']
+                widget.textChanged.connect(lambda text, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_channel_start_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['channel'][0]
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_channel_end_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['channel'][1]
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_pixel_index_start_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['pixelIndex'][0]
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+                
+                widget = getattr(self, f't{i}_state_pixel_index_end_spin_{j}')
+                original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['pixelIndex'][1]
+                widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
 
 
     def stopWorker(self):
@@ -373,7 +528,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         print_string = '\n'
         for key, value in vpm.items():
             print_string += f"Telescope {key} - Elevation: {value['elevation_raw']}, Azimuth: {value['azimuth_raw']}\n"
-        logger.log(logging.INFO, print_string, extra=extra)
+        #logger.log(logging.INFO, print_string, extra=extra)
 
     def handle_star_field_data(self, star_positions):
 
@@ -433,10 +588,22 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                     text_item.setParentItem(scatter_plot)
                     text_item.setPos(x, y)
                     text_item.setFont(font)
-
             else:
                 self.star_field[i] = None
                 self.star_field_labels[i] = None
+        if self.star_field_request:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            print_string = '\n'
+            for i in range(4):
+                print_string += f"\nTelescope {i+1} - Stars in FOV: {len(array_star_labels[i])}\n"
+                print_string += f"___________________________________\n"
+                for j, star in enumerate(array_star_labels[i]):
+                    offset = (f"{array_star_positions[i][j][0]:.3f}", f"{array_star_positions[i][j][1]:.3f}")
+                    print_string += f"Star {j+1}: {star}\n"
+                    print_string += f"Offset: {offset}\n"
+                    print_string += f"-----------------------------------\n"
+            logger.log(logging.INFO, print_string, extra=extra)
+            self.star_field_request = False
         return
 
 
@@ -450,7 +617,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
     def updateLog(self, status, record):
         color = self.COLORS.get(record.levelno, 'black')
         s = '<pre><font color="%s">%s</font></pre>' % (color, status)
-        self.LogBox.appendHtml(s)
+        self.log_edit.appendHtml(s)
         
     def update(self):
         #self.pixelData = self.listenOutQueue.get()
@@ -589,6 +756,6 @@ if __name__ == "__main__":
     QtCore.QThread.currentThread().setObjectName('MainThread')
     app = QtWidgets.QApplication(sys.argv)
     window = Window()
-    #load_stylesheet(app, "Genetive.qss")
+    load_stylesheet(app, "Genetive.qss")
     window.show()
     sys.exit(app.exec())
