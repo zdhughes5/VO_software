@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>2018</width>
+    <width>1716</width>
     <height>1138</height>
    </rect>
   </property>
@@ -636,6 +636,13 @@
             </layout>
            </item>
            <item>
+            <widget class="QPushButton" name="pushButton_2">
+             <property name="text">
+              <string>PushButton</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <spacer name="main_control_frame_vspacer">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -743,29 +750,74 @@
            <number>1</number>
           </property>
           <layout class="QGridLayout" name="gridLayout_4">
-           <item row="7" column="0">
-            <widget class="Line" name="line_2">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="12" column="0">
-            <widget class="QLabel" name="log_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>Log</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
+           <item row="3" column="0">
+            <layout class="QHBoxLayout" name="veritas_sql_h_layout_2">
+             <item>
+              <spacer name="veritas_sql_status_hspacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="veritas_sql_status_v_layout_1">
+               <item>
+                <widget class="QLabel" name="veritas_sql_status_label">
+                 <property name="text">
+                  <string>Status</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="veritas_sql_status_line">
+                 <property name="text">
+                  <string>Offline</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="veritas_sql_status_blank_label">
+                 <property name="text">
+                  <string/>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="veritas_sql_status_v_layout_2">
+               <item>
+                <widget class="QPushButton" name="veritas_sql_status_start_button">
+                 <property name="text">
+                  <string>Start</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="veritas_sql_status_stop_button">
+                 <property name="text">
+                  <string>Stop</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
            </item>
            <item row="9" column="0">
             <layout class="QHBoxLayout" name="fadc_gate_array_h_layout">
@@ -784,6 +836,12 @@
              </item>
              <item>
               <widget class="QComboBox" name="fadc_gate_array_window_combo">
+               <property name="minimumSize">
+                <size>
+                 <width>100</width>
+                 <height>0</height>
+                </size>
+               </property>
                <item>
                 <property name="text">
                  <string>1 KHz</string>
@@ -820,131 +878,25 @@
              </item>
             </layout>
            </item>
-           <item row="11" column="0">
-            <widget class="Line" name="line_6">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
            <item row="13" column="0">
-            <widget class="QPlainTextEdit" name="log_edit">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
+            <widget class="QLabel" name="log_label">
              <property name="font">
               <font>
-               <family>Serif</family>
-               <pointsize>9</pointsize>
-               <weight>50</weight>
-               <bold>false</bold>
+               <pointsize>11</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
               </font>
              </property>
-             <property name="acceptDrops">
-              <bool>false</bool>
+             <property name="text">
+              <string>Log</string>
              </property>
-             <property name="undoRedoEnabled">
-              <bool>false</bool>
-             </property>
-             <property name="readOnly">
-              <bool>true</bool>
-             </property>
-             <property name="plainText">
-              <string/>
-             </property>
-             <property name="backgroundVisible">
-              <bool>false</bool>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0">
-            <layout class="QHBoxLayout" name="veritas_sql_h_layout_2">
-             <item>
-              <spacer name="veritas_sql_status_hspacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <layout class="QVBoxLayout" name="veritas_sql_status_v_layout_1">
-               <item>
-                <widget class="QLabel" name="veritas_sql_status_label">
-                 <property name="text">
-                  <string>Status</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLineEdit" name="veritas_sql_status_line">
-                 <property name="readOnly">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="veritas_sql_status_blank_label">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QVBoxLayout" name="veritas_sql_status_v_layout_2">
-               <item>
-                <widget class="QPushButton" name="veritas_sql_status_start_button">
-                 <property name="text">
-                  <string>Start</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QPushButton" name="veritas_sql_status_stop_button">
-                 <property name="text">
-                  <string>Stop</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-            </layout>
-           </item>
-           <item row="4" column="0">
-            <widget class="Line" name="line">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
              </property>
             </widget>
            </item>
            <item row="6" column="0">
             <layout class="QHBoxLayout" name="VO_server_h_layout">
-             <item>
-              <spacer name="VO_server_left_hspacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
              <item>
               <layout class="QVBoxLayout" name="VO_server_v_layout_3">
                <item>
@@ -983,6 +935,12 @@
                </item>
                <item>
                 <widget class="QLineEdit" name="VO_server_status_line">
+                 <property name="text">
+                  <string>Offline</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
@@ -1017,23 +975,6 @@
              </item>
             </layout>
            </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="veritas_sql_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>VERITAS SQL Server</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
            <item row="1" column="0">
             <layout class="QHBoxLayout" name="veritas_sql_h_layout_1">
              <item>
@@ -1065,6 +1006,87 @@
              </item>
             </layout>
            </item>
+           <item row="8" column="0">
+            <widget class="QLabel" name="fadc_gate_array_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>FADC Gate Array</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="Line" name="line_2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="veritas_sql_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>VERITAS SQL Server</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="14" column="0">
+            <widget class="QPlainTextEdit" name="log_edit">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="font">
+              <font>
+               <family>Serif</family>
+               <pointsize>9</pointsize>
+               <weight>50</weight>
+               <bold>false</bold>
+              </font>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="undoRedoEnabled">
+              <bool>false</bool>
+             </property>
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+             <property name="plainText">
+              <string/>
+             </property>
+             <property name="backgroundVisible">
+              <bool>false</bool>
+             </property>
+            </widget>
+           </item>
            <item row="5" column="0">
             <widget class="QLabel" name="VO_server_title_label">
              <property name="font">
@@ -1082,20 +1104,17 @@
              </property>
             </widget>
            </item>
-           <item row="8" column="0">
-            <widget class="QLabel" name="fadc_gate_array_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
+           <item row="11" column="0">
+            <widget class="Line" name="line_6">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
              </property>
+            </widget>
+           </item>
+           <item row="12" column="0">
+            <widget class="QPushButton" name="pushButton_3">
              <property name="text">
-              <string>FADC Gate Array</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <string>PushButton</string>
              </property>
             </widget>
            </item>
@@ -1132,7 +1151,7 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>1970</width>
+             <width>1836</width>
              <height>1006</height>
             </rect>
            </property>
@@ -4684,7 +4703,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>2018</width>
+     <width>1716</width>
      <height>27</height>
     </rect>
    </property>
