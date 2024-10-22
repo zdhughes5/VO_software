@@ -2,8 +2,11 @@
 import pymysql
 import time
 from multiprocessing import Queue
+from queue import Empty
+from sys import exit
 
-def query_last_pointing(queue: Queue, db_config: dict):
+def query_last_pointing(queue: Queue, db_config: dict, command_queue: Queue):
+    n = 0
     while True:
         start_time = time.time()
         try:
@@ -38,5 +41,16 @@ def query_last_pointing(queue: Queue, db_config: dict):
         except Exception as e:
             print(f"Error in query_last_pointing: {e}")
             continue
-        
-        time.sleep(2.5)  # Query every 1 second
+        n += 1
+        #print('Beep ', n)
+        # Assuming command_queue is an instance of queue.Queue
+        try:
+            item = command_queue.get(timeout=2.5)  # Wait for up to 5 seconds
+            print(f"VPM querying subprocess exiting...")
+            exit(0)
+            break
+            # Process the item
+        except Empty:
+            # Handle the case where the queue is empty after the timeout
+            #print("No command received")
+            pass

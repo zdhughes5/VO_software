@@ -47,6 +47,7 @@ const (
 	testCmd
 	startDataForwardingCmd
 	stopDataForwardingCmd
+	hearbeatCmd
 	// Add more enum values here
 )
 
@@ -91,13 +92,19 @@ func main() {
 	////////// Establish Connections //////////
 
 	// For receiving commands to this server.
-	udpControlConn, err := netutils.EstablishUDPConnection(config.ControlConnIP)
+	udpControlConn, err := netutils.EstablishUDPConnection(config.ServerControlConnIP)
 	if err != nil {
 		log.Panic("Got error in establishing control connection:", err)
 	}
 	defer udpControlConn.Close()
 
 	///////////////////////////////////////////
+
+	udpHeartbeatConn, err := netutils.EstablishUDPConnectionForWrite(config.GuiHeartbeatConnIP)
+	if err != nil {
+		log.Panic("Got error in establishing heartbeat connection:", err)
+	}
+	defer udpHeartbeatConn.Close()
 
 	ctrlBuf := make([]byte, 8000)
 	var receivedMap map[string]interface{}
@@ -164,6 +171,9 @@ func main() {
 			return
 		case testCmd:
 			fmt.Println("Got Test!!")
+		case hearbeatCmd:
+			//fmt.Println("Got Heartbeat!!")
+			_, _ = udpHeartbeatConn.Write([]byte("Heartbeat"))
 		default:
 			fmt.Println("What!?")
 
@@ -221,7 +231,7 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 		}
 	}
 
-	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(config.GuiIP)
+	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(config.GuiDataConnIP)
 	if udpErr != nil {
 		log.Panic("Got error in establishing GUI connection:", udpErr)
 	}

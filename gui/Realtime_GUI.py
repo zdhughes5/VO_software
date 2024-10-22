@@ -37,6 +37,8 @@ from multiprocessing import Process, Queue
 from db_worker_process import query_last_pointing
 import json
 import resources_rc
+import os
+import signal
 
 
 
@@ -90,10 +92,9 @@ class database_worker(QtCore.QObject):
     star_field_signal = QtCore.pyqtSignal(dict)
     start_querying_VPM_signal = QtCore.pyqtSignal()
     stop_querying_VPM_signal = QtCore.pyqtSignal()
-    query_timeout_signal = QtCore.pyqtSignal()
     query_run_number_signal = QtCore.pyqtSignal(int)
     query_timeout_signal = QtCore.pyqtSignal()
-    query_ok_signal = QtCore.pyqtSignal()
+    query_ok_signal = QtCore.pyqtSignal(bool)
 
     def __init__(self):
         super().__init__()
@@ -122,6 +123,7 @@ class database_worker(QtCore.QObject):
         }
 
         self.queue = Queue(maxsize=1)
+        self.command_queue = Queue()
         self.process = None
 
         self.start_querying_VPM_signal.connect(self.start_querying)
@@ -130,15 +132,26 @@ class database_worker(QtCore.QObject):
     def start_querying(self):
         if self.process is not None:
             self.stop_querying()
-        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config))
+        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config, self.command_queue))
         self.process.start()
         self.vpm_timer.start(int(self.queue_check_interval*1000))  # Check the queue every 2.5 seconds
 
     def stop_querying(self):
+        #print("stop_querying called") 
         if self.process is not None:
-            self.process.terminate()
-            self.process.join()
-            self.process = None
+            try:
+                self.command_queue.put(False)
+                #print('Put command')
+                self.process.terminate()
+                self.process.join(timeout=3)  # Wait for 5 seconds for the process to terminate
+                if self.process.is_alive():
+                    #print('bop')
+                    os.kill(self.process.pid, signal.SIGKILL)
+                    self.process.join()
+            except Exception as e:
+                print(f"Error terminating process: {e}")
+            finally:
+                self.process = None
         self.vpm_timer.stop()
 
 
@@ -147,13 +160,13 @@ class database_worker(QtCore.QObject):
             vpm = self.queue.get()
             self.VPM_fetched_signal.emit(vpm)
             self.calculate_star_offsets(vpm)
-            self.query_ok_signal.emit()
+            self.query_ok_signal.emit(True)
             self.queue_check_counter = 0
         else:
             self.queue_check_counter += 1
             if self.queue_check_counter >= self.maximum_queue_checks:
                 extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-                self.query_timeout_signal.emit()
+                self.query_ok_signal.emit(False)
                 if self.queue_check_counter % self.maximum_queue_checks == 0:
                     logger.log(logging.WARNING, "Haven't got pointing from VERITAS MySQL DB worker in %d seconds" % (self.queue_check_counter*self.queue_check_interval), extra=extra)
 
@@ -203,6 +216,30 @@ class database_worker(QtCore.QObject):
         elapsed_time = time.time() - start_time
         print(f"fetch_data took {elapsed_time:.4f} seconds")
 
+class VeritasSQLPingWorker(QtCore.QThread):
+    result_signal = QtCore.pyqtSignal(bool)
+    error_signal = QtCore.pyqtSignal(str)
+
+    def run(self):
+        db_config = {
+            'host': 'romulus.ucsc.edu',
+            'db': 'VERITAS',
+            'user': 'readonly',
+            'cursorclass': pymysql.cursors.DictCursor,
+            'charset': 'utf8'
+        }
+        try:
+            dbcnx = pymysql.connect(**db_config)
+            crs = dbcnx.cursor()
+            query = 'SELECT run_id FROM tblRun_Info ORDER BY run_id DESC LIMIT 1'
+            crs.execute(query)
+            result = crs.fetchone()
+            crs.close()
+            dbcnx.close()
+            self.result_signal.emit(bool(result))
+        except Exception as e:
+            self.error_signal.emit(str(e))
+
 
 
 class Window(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -243,6 +280,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.actionExit.triggered.connect(self.close)
 
+        self.config_data = None
+
         self.starPos = [(0,0)]
         self.star_field = [None, None, None, None]
         self.star_field_labels = [None, None, None, None]
@@ -282,7 +321,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
         #self.nPts = 255
         self.nPts = 255
-        self.ptr1 = 0
+        self.ptr1 = -1000
         self.colormap = pg.colormap.get('CET-CBL2')
         self.valueRange = np.linspace(0, 66000, num=self.nPts)
         #self.valueRange = np.linspace(0, 255, num=self.nPts)
@@ -340,39 +379,208 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.s1.scene().sigMouseMoved.connect(self.onMouseMoved)
 
 
-        self.listenSocket = QUdpSocket()
-        self.listenSocket.bind(QHostAddress.SpecialAddress.LocalHost, 31255)
-        self.listenSocket.readyRead.connect(self.getDatagramAndQueue)
+        self.config_file = '../server/internal/server.json'
+        self.load_config_file()
+        self.establish_connections()
 
 
 
+        #self.listenSocket = QUdpSocket()
+        #self.listenSocket.bind(QHostAddress.SpecialAddress.LocalHost, 31255)
+        #self.listenSocket.readyRead.connect(self.getDatagramAndQueue)
 
-        # Create the worker and thread
-        self.db_worker = database_worker()
-        self.db_thread = QtCore.QThread()
 
-        # Move the worker to the thread
-        self.db_worker.moveToThread(self.db_thread)
+        self.db_thread = None
+        self.db_worker = None
+        self.db_worker_active = False
 
-        # Connect signals and slots
-        self.startWorkerSignal.connect(self.db_worker.start_querying_VPM_signal)
-        self.stopWorkerSignal.connect(self.db_worker.stop_querying_VPM_signal)
-        self.db_worker.VPM_fetched_signal.connect(self.handle_VPM_data)
-        self.db_worker.star_field_signal.connect(self.draw_star_field)
+
 
         self.actionLoad_state_file.triggered.connect(self.load_state_file)
+        #self.actionLoad_config_file.triggered.connect(self.load_config_file)
         self.state_edit_check.toggled.connect(self.toggle_state_edit)  # Connect the checkbox to the function
         self.state_edit_set_button.clicked.connect(self.set_changes)
         self.state_edit_undo_button.clicked.connect(self.undo_changes)
 
 
-        # Start the thread
-        self.db_thread.start()
-        self.startWorkerSignal.emit()
+
 
         # Connect signals to mark widgets as modified
         self.star_field_request = False
         self.data_display_star_field_button.clicked.connect(self.requestStarField)
+
+        self.data_display_clear_ts_button.clicked.connect(self.clear_time_series_data)
+        self.veritas_sql_ping_button.clicked.connect(self.ping_veritas_sql)
+
+        self.veritas_sql_status_start_button.clicked.connect(self.start_db_thread)
+        self.veritas_sql_status_stop_button.clicked.connect(self.stop_db_thread)
+
+    def establish_connections(self):
+
+        gui_data_ip, gui_data_port = self.config_data["guiDataConnIP"].split(':')
+        gui_heartbeat_ip, gui_heartbeat_port = self.config_data["guiHeartbeatConnIP"].split(':')
+
+        self.listenSocket = QUdpSocket()
+        self.listenSocket.bind(QHostAddress(gui_data_ip), int(gui_data_port))
+        self.listenSocket.readyRead.connect(self.getDatagramAndQueue)
+
+        self.VO_server_ip_line.setText(self.config_data["serverControlConnIP"])
+
+        self.heartbeatSocket = QUdpSocket()
+        self.heartbeatSocket.bind(QHostAddress(gui_heartbeat_ip), int(gui_heartbeat_port))
+        self.heartbeatSocket.readyRead.connect(self.got_heartbeat)
+
+        self.heartbeatSendTimer = QtCore.QTimer()
+        self.heartbeatSendTimer.timeout.connect(self.send_heartbeat)
+        self.heartbeatSendTimer.start(1000)  # Send a heartbeat every 1 seconds
+
+        self.heartbeatRecvTimer = QtCore.QTimer()
+        self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
+        self.heartbeatRecvTimer.start(3000)  # Check for a heartbeat every 5 seconds
+
+
+    def got_heartbeat(self):
+        datagram = self.heartbeatSocket.receiveDatagram(8000)
+        # Process the received datagram
+        #print(f"Received heartbeat: {datagram.data().decode()}")
+        self.VO_server_status_line.setStyleSheet("background-color: green; color: white;")
+        self.VO_server_status_line.setText("Connected")
+        self.reset_heartbeat_timer()
+
+    def reset_heartbeat_timer(self):
+        self.heartbeatRecvTimer.stop()
+        self.heartbeatRecvTimer.start(3000)  # Reset the timer with a 10-second interval
+
+    def handle_heartbeat_timeout(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.VO_server_status_line.setStyleSheet("background-color: red; color: white;")
+        self.VO_server_status_line.setText("Disconnected")
+        logger.log(logging.WARNING, "Heartbeat timeout. VO server disconnected.", extra=extra)
+
+    def send_heartbeat(self):
+        server_heartbeat_ip, server_heartbeat_port = self.config_data["serverControlConnIP"].split(':')
+        server_heartbeat_port = int(server_heartbeat_port)
+
+        # Create the JSON object
+        heartbeat_message = json.dumps({"command": 7})
+        datagram = heartbeat_message.encode()
+
+        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_heartbeat_ip), server_heartbeat_port)
+        #print(f"Sent heartbeat to {server_heartbeat_ip}:{server_heartbeat_port} with message: {heartbeat_message}")
+
+
+
+
+
+    def load_config_file(self):
+        try:
+            with open(self.config_file, 'r') as file:
+                self.config_data = json.load(file)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, "Error", f"Failed to load config file: {e}")
+            logger.log(logging.ERROR, f"Failed to load config file: {e}")
+
+
+    def start_db_thread(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if not self.db_worker_active:
+            # Create the worker and thread
+            self.db_worker = database_worker()
+            self.db_thread = QtCore.QThread()
+
+            # Move the worker to the thread
+            self.db_worker.moveToThread(self.db_thread)
+
+            # Connect signals and slots
+            self.startWorkerSignal.connect(self.db_worker.start_querying_VPM_signal)
+            self.stopWorkerSignal.connect(self.db_worker.stop_querying_VPM_signal)
+            self.db_worker.VPM_fetched_signal.connect(self.handle_VPM_data)
+            self.db_worker.star_field_signal.connect(self.draw_star_field)
+            self.db_worker.query_ok_signal.connect(self.veritas_sql_status)
+
+            # Start the thread
+            self.db_thread.start()
+            self.startWorkerSignal.emit()
+            self.db_worker_active = True
+            logger.log(logging.INFO, "Started VERITAS SQL database thread.", extra=extra)
+
+    def veritas_sql_status(self, ok):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if ok:
+            self.veritas_sql_status_line.setStyleSheet("background-color: green; color: white;")
+            self.veritas_sql_status_line.setText("Running")
+        else:
+            self.veritas_sql_status_line.setStyleSheet("background-color: red; color: white;")
+            self.veritas_sql_status_line.setText("Timeout")
+            #logger.log(logging.WARNING, "VERITAS SQL database timeout.", extra=extra)
+
+
+    def stop_db_thread(self):
+        #print('What')
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.db_worker_active:
+            self.stopWorkerSignal.emit()
+            self.db_thread.quit()
+            self.db_thread.wait()
+
+            # Disconnect signals to avoid any pending signal-slot connections
+            self.stopWorkerSignal.disconnect(self.db_worker.stop_querying_VPM_signal)
+            self.startWorkerSignal.disconnect(self.db_worker.start_querying_VPM_signal)
+            self.db_worker.VPM_fetched_signal.disconnect(self.handle_VPM_data)
+            self.db_worker.star_field_signal.disconnect(self.draw_star_field)
+            self.db_worker.query_ok_signal.disconnect(self.veritas_sql_status)
+
+            # Clean up the worker and thread
+            self.db_worker.deleteLater()
+            self.db_thread.deleteLater()
+            self.db_worker_active = False
+
+            self.veritas_sql_status_line.setStyleSheet("background-color: yellow; color: black;")
+            self.veritas_sql_status_line.setText("Stopped") 
+            logger.log(logging.INFO, "Stopped VERITAS SQL database thread.", extra=extra) 
+
+    def ping_veritas_sql(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.worker = VeritasSQLPingWorker()
+        self.worker.result_signal.connect(self.handle_ping_result)
+        self.worker.error_signal.connect(self.handle_ping_error)
+        logger.log(logging.INFO, "Pinging VERITAS SQL database...", extra=extra)
+        self.worker.start()
+
+    def test(self):
+        print("test")
+
+    def handle_ping_result(self, success):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if success:
+            self.veritas_sql_ping_line.setStyleSheet("background-color: green; color: white;")
+            self.veritas_sql_ping_line.setText("Success!")
+            logger.log(logging.INFO, "VERITAS SQL database ping successful.", extra=extra)
+        else:
+            self.veritas_sql_ping_line.setStyleSheet("background-color: red; color: white;")
+            self.veritas_sql_ping_line.setText("Failed!")
+            logger.log(logging.INFO, "VERITAS SQL database ping failed.", extra=extra)
+
+    def handle_ping_error(self, error_message):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.veritas_sql_ping_line.setStyleSheet("background-color: red; color: white;")
+        self.veritas_sql_ping_line.setText("Failed!")
+        QtWidgets.QMessageBox.critical(None, "Database Error", error_message)
+        logger.log(logging.ERROR, f"Error pinging VERITAS SQL database: {error_message}", extra=extra)
+
+    def clear_time_series_data(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        # Reset the time series data to zero
+        self.pixelTimeSeriesData1 = np.zeros(1000)
+        self.pixelTimeSeriesData2 = np.zeros(1000)
+        self.pixelTimeSeriesData3 = np.zeros(1000)
+        self.pixelTimeSeriesData4 = np.zeros(1000)
+        self.pixelTimeSeriesDataCurve1.setData(self.pixelTimeSeriesData1)
+        self.pixelTimeSeriesDataCurve2.setData(self.pixelTimeSeriesData2)
+        self.pixelTimeSeriesDataCurve3.setData(self.pixelTimeSeriesData3)
+        self.pixelTimeSeriesDataCurve4.setData(self.pixelTimeSeriesData4)
+        self.ptr1 = -1000
+        logger.log(logging.INFO, "Time series data cleared.", extra=extra)
 
     def requestStarField(self):
         self.star_field_request = True
@@ -388,6 +596,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.connect_signals_to_mark_modified()
             self.state_edit_set_button.setEnabled(True)
             self.state_edit_undo_button.setEnabled(True)
+            self.state_edit_check.setEnabled(True)
 
     def undo_changes(self):
         self.update_widgets_from_state()
@@ -513,9 +722,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def stopWorker(self):
-        self.stopWorkerSignal.emit()
-        self.db_thread.quit()
-        self.db_thread.wait()
+        if self.db_worker_active:
+            self.stopWorkerSignal.emit()
+            self.db_thread.quit()
+            self.db_thread.wait()
 
     def closeEvent(self, event):
         self.stopWorker()

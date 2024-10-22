@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1716</width>
+    <width>1785</width>
     <height>1138</height>
    </rect>
   </property>
@@ -159,7 +159,7 @@
               <widget class="QComboBox" name="obs_params_run_type_combo">
                <property name="minimumSize">
                 <size>
-                 <width>100</width>
+                 <width>110</width>
                  <height>0</height>
                 </size>
                </property>
@@ -627,6 +627,13 @@
               </spacer>
              </item>
              <item>
+              <widget class="QPushButton" name="data_display_clear_ts_button">
+               <property name="text">
+                <string>Clear Time Series</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QPushButton" name="data_display_star_field_button">
                <property name="text">
                 <string>Print Star Field</string>
@@ -634,13 +641,6 @@
               </widget>
              </item>
             </layout>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButton_2">
-             <property name="text">
-              <string>PushButton</string>
-             </property>
-            </widget>
            </item>
            <item>
             <spacer name="main_control_frame_vspacer">
@@ -910,7 +910,11 @@
                 </widget>
                </item>
                <item>
-                <widget class="QLineEdit" name="VO_server_ip_line"/>
+                <widget class="QLineEdit" name="VO_server_ip_line">
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
                </item>
                <item>
                 <widget class="QLabel" name="VO_server_blank_label_2">
@@ -992,6 +996,15 @@
              </item>
              <item>
               <widget class="QLineEdit" name="veritas_sql_ping_line">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>-</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
                <property name="readOnly">
                 <bool>true</bool>
                </property>
@@ -1151,7 +1164,7 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>1836</width>
+             <width>1890</width>
              <height>1006</height>
             </rect>
            </property>
@@ -2367,7 +2380,7 @@
                    </property>
                    <property name="minimumSize">
                     <size>
-                     <width>94</width>
+                     <width>102</width>
                      <height>0</height>
                     </size>
                    </property>
@@ -3763,6 +3776,9 @@
               </item>
               <item>
                <widget class="QCheckBox" name="state_edit_check">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
                 <property name="text">
                  <string>Edit</string>
                 </property>
@@ -4703,7 +4719,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1716</width>
+     <width>1785</width>
      <height>27</height>
     </rect>
    </property>
@@ -4711,6 +4727,7 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionLoad_config_file"/>
     <addaction name="actionLoad_state_file"/>
     <addaction name="actionExit"/>
     <addaction name="separator"/>
@@ -4726,6 +4743,11 @@
   <action name="actionLoad_state_file">
    <property name="text">
     <string>Load state file...</string>
+   </property>
+  </action>
+  <action name="actionLoad_config_file">
+   <property name="text">
+    <string>Load config file...</string>
    </property>
   </action>
  </widget>

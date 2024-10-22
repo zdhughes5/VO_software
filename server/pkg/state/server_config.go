@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	ControlConnIP string `json:"controlConnIP"`
-	GuiIP         string `json:"guiIP"`
+	ServerControlConnIP string `json:"serverControlConnIP"`
+	GuiDataConnIP       string `json:"guiDataConnIP"`
+	GuiHeartbeatConnIP  string `json:"guiHeartbeatConnIP"`
 }
 
 func LoadConfig(filename string) (*Config, error) {
