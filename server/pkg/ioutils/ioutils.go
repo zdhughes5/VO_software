@@ -47,9 +47,9 @@ func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.Fil
 		}
 		return outputFile, nil
 	} else {
-		log.Println("File already exists:", outputFileName, "Check you're run number!")
+		//log.Println("File already exists:", outputFileName, "Check you're run number!")
 		outputFileName = dataSaveDir + runNumber + "_" + telescopeString + "_" + randomString + ".bin"
-		log.Println("Shunting data to:", outputFileName)
+		//log.Println("Shunting data to:", outputFileName)
 		outputFile, createErr := os.Create(outputFileName)
 		if createErr != nil {
 			log.Panicf("Got error creating output file: %v", createErr)

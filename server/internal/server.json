@@ -1,5 +1,24 @@
 {
     "serverControlConnIP": "127.0.0.1:31250",
     "guiDataConnIP": "127.0.0.1:31255",
-    "guiHeartbeatConnIP": "127.0.0.1:31256"
+    "guiHeartbeatConnIP": "127.0.0.1:31256",
+    "guiStatusConnIP": "127.0.0.1:31257",
+    "dataSavePath": "/home/zdhughes/optical_data/",
+    "commands": {
+        "nothing": 0,
+        "startRunCmd": 1,
+        "continousRunCmd": 2,
+        "exitCmd": 3,
+        "testCmd": 4,
+        "startDataForwardingCmd": 5,
+        "stopDataForwardingCmd": 6,
+        "hearbeatCmd": 7,
+        "stopRunCmd": 8
+    },
+    "status": {
+        "started": 1000,
+        "aborted": 1001,
+        "ended": 1002,
+        "ended_manually": 1003
+    }
 }

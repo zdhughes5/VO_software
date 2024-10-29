@@ -39,6 +39,12 @@ import json
 import resources_rc
 import os
 import signal
+import subprocess
+import psycopg
+from datetime import datetime
+import struct
+
+
 
 
 
@@ -103,7 +109,7 @@ class database_worker(QtCore.QObject):
         self.running = False
         self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
-        with open('/home/zdhughes/VERITAS_optical/data/asu2.dat', 'r') as f:
+        with open('catalogs/asu2.dat', 'r') as f:
             lines = [x for x in f]
         self.star_names = np.array([x.split()[0] for x in lines])
         star_RA_deg = np.array([float(x.split()[1]) for x in lines])
@@ -218,6 +224,7 @@ class database_worker(QtCore.QObject):
 
 class VeritasSQLPingWorker(QtCore.QThread):
     result_signal = QtCore.pyqtSignal(bool)
+    runid_signal = QtCore.pyqtSignal(int)
     error_signal = QtCore.pyqtSignal(str)
 
     def run(self):
@@ -232,11 +239,15 @@ class VeritasSQLPingWorker(QtCore.QThread):
             dbcnx = pymysql.connect(**db_config)
             crs = dbcnx.cursor()
             query = 'SELECT run_id FROM tblRun_Info ORDER BY run_id DESC LIMIT 1'
+            
             crs.execute(query)
             result = crs.fetchone()
+            print(result)
             crs.close()
             dbcnx.close()
             self.result_signal.emit(bool(result))
+            self.runid_signal.emit(result['run_id'])
+
         except Exception as e:
             self.error_signal.emit(str(e))
 
@@ -415,10 +426,278 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.veritas_sql_status_start_button.clicked.connect(self.start_db_thread)
         self.veritas_sql_status_stop_button.clicked.connect(self.stop_db_thread)
 
+        self.VO_server_start_button.clicked.connect(self.start_server)
+        self.VO_server_stop_button.clicked.connect(self.stop_server)
+        self.server_process = None  # Initialize the server process variable
+
+        self.obs_params = {
+            'SavePath': self.obs_params_save_path_line.text(),
+            'SourceID': self.obs_params_sourceid_line.text(),
+            'VERITASRunNumber': self.obs_params_veritas_runid_spin.value(),
+            'RunType': self.obs_params_run_type_combo.currentText(),
+            'RunDuration': self.obs_params_duration_spin.value(),
+        }
+        self.VO_db_params_sourceid_line.setText(self.obs_params['SourceID'])
+        self.VO_db_params_vrunid_line.setText(str(self.obs_params['VERITASRunNumber']))
+        self.VO_db_params_run_type_line.setText(self.obs_params['RunType'])
+        self.VO_db_params_duration_line.setText(str(self.obs_params['RunDuration']))
+        self.obs_connect_signals_to_mark_modified()
+        self.obs_params_set_button.clicked.connect(self.obs_set_changes)
+        self.obs_params_undo_button.clicked.connect(self.obs_undo_changes)
+        self.obs_params_veritas_runid_query_button.clicked.connect(self.query_veritas_sql)
+
+        self.VO_db_params = {
+            'veritas_run_id': '',
+            'run_type': '',
+            'run_status': '',
+            'run_window': '',
+            'db_start_time': '',
+            'db_end_time': '',
+            'data_start_time': '',
+            'data_end_time': '',
+            'duration': '',
+            'telescope_mask': '',
+            'harvester_mask': '',
+            'source_id': ''
+        }
+        self.VO_db_params_filled = {
+            'veritas_run_id': False,
+            'run_type': False,
+            'run_status': False,
+            'run_window': False,
+            'db_start_time': False,
+            'db_end_time': False,
+            'data_start_time': False,
+            'data_end_time': False,
+            'duration': False,
+            'telescope_mask': False,
+            'harvester_mask': False,
+            'source_id': False
+        }
+        self.read_last_run_id()
+
+        self.test_button.clicked.connect(self.dump_VO_db_params)
+
+        self.VO_db_params_vrunid_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_run_type_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_run_status_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_run_window_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_db_start_time_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_db_end_time_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_data_start_time_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_data_end_time_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_duration_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_telescope_mask_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_harvester_mask_line.textChanged.connect(self.update_VO_db_params)
+        self.VO_db_params_sourceid_line.textChanged.connect(self.update_VO_db_params)
+
+        self.update_VO_db_params()
+
+        self.populate_dt.clicked.connect(self.set_current_datetime)
+        self.wrtie_db.clicked.connect(self.write_VO_db_params_to_db)
+
+        self.fadc_gate_array_window_set_button.clicked.connect(self.set_fadc_gate_array_window)
+
+        self.send_stop_button.clicked.connect(self.send_stop_message)
+
+    def set_fadc_gate_array_window(self):
+        self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
+
+    def set_current_datetime(self):
+        self.VO_db_params_run_status_line.setText('ended')
+        self.VO_db_params_db_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.VO_db_params_data_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+
+    def write_VO_db_params_to_db(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if not self.check_VO_db_params_filled():
+            logger.log(logging.WARNING, "Not all VO DB parameters are filled.", extra=extra)
+            return
+
+        connection, cursor = None, None
+        try:
+            # Connect to the database
+            connection = psycopg.connect(
+                dbname="telescope_db",
+                user="vo_admin",
+                password="lsttkc#$!",
+                host="localhost",
+                port="5432"
+            )
+            cursor = connection.cursor()
+
+            # Insert the data into the database
+            insert_query = """
+            INSERT INTO tblrun_info (veritas_run_id, run_type, run_status, run_window, db_start_time, db_end_time, data_start_time, data_end_time, duration, telescope_mask, harvester_mask, source_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            run_data = (
+                self.VO_db_params['veritas_run_id'],  # integer
+                self.VO_db_params['run_type'],  # character varying(20)
+                self.VO_db_params['run_status'],  # character varying(20)
+                self.VO_db_params['run_window'],  # integer
+                datetime.strptime(self.VO_db_params['db_start_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
+                datetime.strptime(self.VO_db_params['db_end_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
+                datetime.strptime(self.VO_db_params['data_start_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
+                datetime.strptime(self.VO_db_params['data_end_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
+                self.VO_db_params['duration'],  # interval
+                self.VO_db_params['telescope_mask'],  # integer
+                self.VO_db_params['harvester_mask'],  # integer
+                self.VO_db_params['source_id']  # character varying(255)
+            )
+            cursor.execute(insert_query, run_data)
+            connection.commit()
+            logger.log(logging.INFO, "VO DB parameters inserted successfully", extra=extra)
+            self.read_last_run_id()
+        except Exception as e:
+            logger.log(logging.ERROR, f"Error inserting VO DB parameters: {e}", extra=extra)
+            if connection:
+                connection.rollback()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+                logger.log(logging.INFO, "Database connection closed", extra=extra)
+
+    def check_VO_db_params_filled(self):
+        for key, value in self.VO_db_params_filled.items():
+            if not value:
+                return False
+        return True
+
+    def flag_VO_db_params_filled(self):
+        for key in self.VO_db_params_filled:
+            if self.VO_db_params[key] and self.VO_db_params[key] != 'null':
+                self.VO_db_params_filled[key] = True
+
+
+    def update_VO_db_params(self):
+        self.VO_db_params['veritas_run_id'] = self.VO_db_params_vrunid_line.text()
+        self.VO_db_params['run_type'] = self.VO_db_params_run_type_line.text()
+        self.VO_db_params['run_status'] = self.VO_db_params_run_status_line.text()
+        self.VO_db_params['run_window'] = self.VO_db_params_run_window_line.text()
+        self.VO_db_params['db_start_time'] = self.VO_db_params_db_start_time_line.text()
+        self.VO_db_params['db_end_time'] = self.VO_db_params_db_end_time_line.text()
+        self.VO_db_params['data_start_time'] = self.VO_db_params_data_start_time_line.text()
+        self.VO_db_params['data_end_time'] = self.VO_db_params_data_end_time_line.text()
+        self.VO_db_params['duration'] = self.VO_db_params_duration_line.text()
+        self.VO_db_params['telescope_mask'] = self.VO_db_params_telescope_mask_line.text()
+        self.VO_db_params['harvester_mask'] = self.VO_db_params_harvester_mask_line.text()
+        self.VO_db_params['source_id'] = self.VO_db_params_sourceid_line.text()
+        self.flag_VO_db_params_filled()
+
+
+    def dump_VO_db_params(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        print_string = "Current VO DB parameters:\n"
+        for key, value in self.VO_db_params.items():
+            print_string += f"{key}: {value} {self.VO_db_params_filled[key]}\n"
+        logger.log(logging.INFO, print_string, extra=extra)
+
+    def read_last_run_id(self):
+        connection = None  # Initialize connection to None
+        try:
+            connection = psycopg.connect(
+                dbname="telescope_db",
+                user="vo_admin",
+                password="lsttkc#$!",
+                host="localhost",
+                port="5432"
+            )
+            cursor = connection.cursor()
+            cursor.execute("SELECT MAX(run_id) FROM tblrun_info;")
+            last_run_id = cursor.fetchone()[0]
+            if last_run_id is None:
+                last_run_id = 0
+            self.VO_db_params_runid_line.setText(str(last_run_id + 1))
+        except Exception as e:
+            print(f"Error reading last run ID: {e}")
+        finally:
+            if connection:
+                cursor.close()
+                connection.close()
+
+
+
+
+
+    def start_server(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if not self.server_process:
+            try:
+                server_path = os.path.abspath("../server/bin/server")
+                server_dir = os.path.dirname(server_path)
+                self.server_process = subprocess.Popen([server_path], cwd=server_dir)
+
+                self.heartbeatSendTimer = QtCore.QTimer()
+                self.heartbeatSendTimer.timeout.connect(self.send_heartbeat)
+                self.heartbeatSendTimer.start(1000)  # Send a heartbeat every 1 seconds
+
+                self.heartbeatRecvTimer = QtCore.QTimer()
+                self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
+                self.heartbeatRecvTimer.start(3000)  # Check for a heartbeat every 5 seconds
+
+                logger.log(logging.INFO, f"Server started successfully with PID: {self.server_process.pid}", extra=extra)
+            except Exception as e:
+                logger.log(logging.ERROR, f"Failed to start server: {e}", extra=extra)
+        else:
+            print_string = f"Server is already running at PID: {self.server_process.pid}"
+            logger.log(logging.WARNING, print_string, extra=extra)
+
+    def check_server_is_stopped(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.server_process:
+            try:
+                os.kill(self.server_process.pid, 0)
+                print('beep')
+            except OSError or ProcessLookupError:
+                logger.log(logging.INFO, f"Server process with PID {self.server_process.pid} has been terminated (OSError).", extra=extra)
+                self.server_process = None
+                self.VO_server_status_line.setStyleSheet("background-color: yellow; color: black;")
+                self.VO_server_status_line.setText("Stopped")
+            except Exception as e:
+                logger.log(logging.ERROR, f"Failed to check server status: {e}", extra=extra)
+                os.kill(self.server_process.pid, signal.SIGTERM)
+            else:
+                logger.log(logging.WARNING, f"Server process with PID {self.server_process.pid} is still running.", extra=extra)
+                os.kill(self.server_process.pid, signal.SIGTERM)
+
+    def stop_server(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.server_process:
+            try:
+                server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
+                server_control_port = int(server_control_port)
+
+                # Create the JSON object
+                stop_message = json.dumps({"command": 3})
+                datagram = stop_message.encode()
+
+                self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
+
+                self.heartbeatSendTimer.stop()
+                self.heartbeatRecvTimer.stop()
+                self.heartbeatSendTimer.timeout.disconnect(self.send_heartbeat)
+                self.heartbeatRecvTimer.timeout.disconnect(self.handle_heartbeat_timeout)
+
+                QtCore.QTimer.singleShot(1000, self.check_server_is_stopped)
+                self.server_process.wait()
+
+            except Exception as e:
+                logger.log(logging.ERROR, f"Failed to stop server: {e}", extra=extra)
+                QtWidgets.QMessageBox.critical(None, "Error", f"Failed to stop server: {e}")
+        else:
+            logger.log(logging.INFO, "Server is not running.", extra=extra)
+
     def establish_connections(self):
 
         gui_data_ip, gui_data_port = self.config_data["guiDataConnIP"].split(':')
         gui_heartbeat_ip, gui_heartbeat_port = self.config_data["guiHeartbeatConnIP"].split(':')
+        gui_status_ip, gui_status_port = self.config_data["guiStatusConnIP"].split(':')
 
         self.listenSocket = QUdpSocket()
         self.listenSocket.bind(QHostAddress(gui_data_ip), int(gui_data_port))
@@ -430,13 +709,28 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.heartbeatSocket.bind(QHostAddress(gui_heartbeat_ip), int(gui_heartbeat_port))
         self.heartbeatSocket.readyRead.connect(self.got_heartbeat)
 
-        self.heartbeatSendTimer = QtCore.QTimer()
-        self.heartbeatSendTimer.timeout.connect(self.send_heartbeat)
-        self.heartbeatSendTimer.start(1000)  # Send a heartbeat every 1 seconds
+        self.statusSocket = QUdpSocket()
+        self.statusSocket.bind(QHostAddress(gui_status_ip), int(gui_status_port))
+        self.statusSocket.readyRead.connect(self.got_status)
 
-        self.heartbeatRecvTimer = QtCore.QTimer()
-        self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
-        self.heartbeatRecvTimer.start(3000)  # Check for a heartbeat every 5 seconds
+    def invert_dict(self, d):
+        return {v: k for k, v in d.items()}
+
+    def get_key_from_value(self, inverted_dictionary, value):
+        return inverted_dictionary.get(value, None)
+
+    def got_status(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        datagram = self.statusSocket.receiveDatagram(8000)
+        status_code = struct.unpack('>I', datagram.data())[0]  # '>I' for big-endian unsigned int
+        print(self.config_data["status"])
+        statuses = self.invert_dict(self.config_data["status"])
+        status_key = self.get_key_from_value(statuses, status_code)
+
+        logger.log(logging.INFO, f"Received status: {status_code}, corresponding to {status_key}", extra=extra)
+        
+        # Now you can compare status_code with the value in the JSON file
+
 
 
     def got_heartbeat(self):
@@ -458,28 +752,34 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         logger.log(logging.WARNING, "Heartbeat timeout. VO server disconnected.", extra=extra)
 
     def send_heartbeat(self):
-        server_heartbeat_ip, server_heartbeat_port = self.config_data["serverControlConnIP"].split(':')
-        server_heartbeat_port = int(server_heartbeat_port)
+        server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
+        server_control_port = int(server_control_port)
 
         # Create the JSON object
         heartbeat_message = json.dumps({"command": 7})
         datagram = heartbeat_message.encode()
 
-        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_heartbeat_ip), server_heartbeat_port)
+        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
         #print(f"Sent heartbeat to {server_heartbeat_ip}:{server_heartbeat_port} with message: {heartbeat_message}")
 
+    def send_stop_message(self):
+        server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
+        server_control_port = int(server_control_port)
 
+        # Create the JSON object
+        stop_message = json.dumps({"command": 8})
+        datagram = stop_message.encode()
 
-
+        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
 
     def load_config_file(self):
         try:
             with open(self.config_file, 'r') as file:
                 self.config_data = json.load(file)
+            self.obs_params_save_path_line.setText(self.config_data["dataSavePath"])
         except Exception as e:
             QtWidgets.QMessageBox.critical(None, "Error", f"Failed to load config file: {e}")
             logger.log(logging.ERROR, f"Failed to load config file: {e}")
-
 
     def start_db_thread(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -514,7 +814,6 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.veritas_sql_status_line.setText("Timeout")
             #logger.log(logging.WARNING, "VERITAS SQL database timeout.", extra=extra)
 
-
     def stop_db_thread(self):
         #print('What')
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -547,8 +846,20 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         logger.log(logging.INFO, "Pinging VERITAS SQL database...", extra=extra)
         self.worker.start()
 
+    def query_veritas_sql(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.worker = VeritasSQLPingWorker()
+        self.worker.runid_signal.connect(self.update_veritas_runid)
+        self.worker.error_signal.connect(self.handle_ping_error)
+        logger.log(logging.INFO, "Querying VERITAS SQL database...", extra=extra)
+        self.worker.start()
+
+
     def test(self):
         print("test")
+
+    def update_veritas_runid(self, runid):
+        self.obs_params_veritas_runid_spin.setValue(runid)
 
     def handle_ping_result(self, success):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -584,7 +895,23 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def requestStarField(self):
         self.star_field_request = True
-        
+
+    def calculate_telescope_mask(self):
+        mask = 0
+        for i in range(4):
+            telescope = self.state_data['telescopes'][i]
+            mask |= telescope['missing'] << i
+        return mask
+    
+    def calculate_harvester_mask(self):
+        mask = 0
+        for i in range(4):
+            telescope = self.state_data['telescopes'][i]
+            for j in range(8):
+                harvester = telescope['harvesters'][j]
+                mask |= harvester['missing'] << (i*8+j)
+        return mask
+
 
     def load_state_file(self):
         file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load State File", "", "JSON Files (*.json);;All Files (*)")
@@ -597,6 +924,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.state_edit_set_button.setEnabled(True)
             self.state_edit_undo_button.setEnabled(True)
             self.state_edit_check.setEnabled(True)
+            self.VO_db_params_telescope_mask_line.setText(bin(self.calculate_telescope_mask()))
+            self.VO_db_params_harvester_mask_line.setText(hex(self.calculate_harvester_mask()))
+
 
     def undo_changes(self):
         self.update_widgets_from_state()
@@ -620,8 +950,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.restore_original_colors()
         self.connect_signals_to_mark_modified()  # Reconnect signals to update original values
+        self.VO_db_params_telescope_mask_line.setText(bin(self.calculate_telescope_mask()))
+        self.VO_db_params_harvester_mask_line.setText(hex(self.calculate_harvester_mask()))
                 
-
     def update_widgets_from_state(self):
         for i in range(4):  # Assuming there are 4 telescopes
             telescope = self.state_data['telescopes'][i]
@@ -719,6 +1050,54 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 original_value = self.state_data['telescopes'][i-1]['harvesters'][j-1]['pixelIndex'][1]
                 widget.valueChanged.connect(lambda value, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
 
+    def obs_connect_signals_to_mark_modified(self):
+        widget = getattr(self, f'obs_params_save_path_line')
+        original_value = self.obs_params['SavePath']
+        widget.textChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
+        widget = getattr(self, f'obs_params_sourceid_line')
+        original_value = self.obs_params['SourceID']
+        widget.textChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
+        widget = getattr(self, f'obs_params_veritas_runid_spin')
+        original_value = self.obs_params['VERITASRunNumber']
+        widget.valueChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
+        widget = getattr(self, f'obs_params_run_type_combo')
+        original_value = self.obs_params['RunType']
+        widget.currentTextChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
+        widget = getattr(self, f'obs_params_duration_spin')
+        original_value = self.obs_params['RunDuration']
+        widget.valueChanged.connect(lambda state, w=widget, v=original_value: self.mark_widget_as_modified(w, v))
+
+    def obs_undo_changes(self):
+        self.obs_update_widgets_from_state()
+        self.restore_original_colors()
+
+    def obs_update_widgets_from_state(self):
+
+        getattr(self, f'obs_params_save_path_line').setText(self.obs_params['SavePath'])
+        getattr(self, f'obs_params_sourceid_line').setText(self.obs_params['SourceID'])
+        getattr(self, f'obs_params_veritas_runid_spin').setValue(self.obs_params['VERITASRunNumber'])
+        getattr(self, f'obs_params_run_type_combo').setCurrentText(self.obs_params['RunType'])
+        getattr(self, f'obs_params_duration_spin').setValue(self.obs_params['RunDuration'])
+
+    def obs_set_changes(self):
+
+        self.obs_params['SavePath'] = getattr(self, f'obs_params_save_path_line').text()
+        self.obs_params['SourceID'] = getattr(self, f'obs_params_sourceid_line').text()
+        self.obs_params['VERITASRunNumber'] = getattr(self, f'obs_params_veritas_runid_spin').value()
+        self.obs_params['RunType'] = getattr(self, f'obs_params_run_type_combo').currentText()
+        self.obs_params['RunDuration'] = getattr(self, f'obs_params_duration_spin').value()
+
+        self.VO_db_params_sourceid_line.setText(self.obs_params['SourceID'])
+        self.VO_db_params_vrunid_line.setText(str(self.obs_params['VERITASRunNumber']))
+        self.VO_db_params_run_type_line.setText(self.obs_params['RunType'])
+        self.VO_db_params_duration_line.setText(str(self.obs_params['RunDuration']))
+        
+        self.restore_original_colors()
+        self.obs_connect_signals_to_mark_modified()  # Reconnect signals to update original values
 
 
     def stopWorker(self):
@@ -729,6 +1108,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         self.stopWorker()
+        self.stop_server() # Make a purpose-built function to stop the server
         event.accept()
 
     def handle_VPM_data(self, vpm):

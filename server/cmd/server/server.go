@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -57,14 +58,37 @@ const (
 // func extractEventNumber()
 
 // Declare the global variable
+var ErrChannelAlreadyClosed = errors.New("channel already closed")
 var globalState state.SystemState
 var runReady bool = true
 var configFileName string = "../internal/server.json"
 var config state.Config
 
+func safeClose(ch chan struct{}) (thing error) {
+	log.Println("Closing channel")
+	thing = nil
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic: %v", r)
+			log.Printf("Error: %v", thing)
+			thing = ErrChannelAlreadyClosed
+			log.Printf("Post Error: %v", thing)
+		}
+	}()
+	close(ch)
+	return thing
+}
+
 func UNUSED(x ...interface{}) {}
 
 func main() {
+
+	/*pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println(pwd)*/
 
 	/////////////////// Start Logger //////////
 
@@ -74,6 +98,7 @@ func main() {
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
+	//log.SetOutput(logFile)
 	log.Println("Server started.")
 
 	///////////////////////////////////////////
@@ -106,20 +131,32 @@ func main() {
 	}
 	defer udpHeartbeatConn.Close()
 
+	udpStatusConn, err := netutils.EstablishUDPConnectionForWrite(config.GuiStatusConnIP)
+	if err != nil {
+		log.Panic("Got error in establishing status connection:", err)
+	}
+	defer udpStatusConn.Close()
+
 	ctrlBuf := make([]byte, 8000)
 	var receivedMap map[string]interface{}
-	var cmd ctrlCmd
+	var cmd int
 
 	stopForwarding := make(chan struct{})
+	//stopListening := make(chan struct{})
+	//listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
+	//listeningTimer := time.NewTimer(time.Duration(1) * time.Nanosecond)
+	//log.Printf("Pre: listeningTimer address: %p", listeningTimer)
+	//<-listeningTimer.C
+	//UNUSED(listeningTimer)
 
 	for {
 
-		n, addr, err := udpControlConn.ReadFromUDP(ctrlBuf)
+		n, _, err := udpControlConn.ReadFromUDP(ctrlBuf)
 		if err != nil {
 			log.Println("Error in reading packet from control connection:", err)
 			continue
 		}
-		log.Printf("Got %d bytes from UDP control packet from address %v \n", n, addr)
+		//log.Printf("Got %d bytes from UDP control packet from address %v \n", n, addr)
 		receivedJSON := ctrlBuf[:n]
 		err = json.Unmarshal(receivedJSON, &receivedMap)
 		if err != nil {
@@ -127,10 +164,11 @@ func main() {
 			return
 		}
 
-		cmd = ctrlCmd(receivedMap["command"].(float64))
+		cmd = int(receivedMap["command"].(float64))
 
 		switch cmd {
-		case startRunCmd:
+		case config.Commands.StartRunCmd:
+			//stopListening := make(chan struct{})
 
 			runDuration := uint64(receivedMap["duration"].(float64))
 			runNumber := uint64(receivedMap["runNumber"].(float64))
@@ -147,35 +185,67 @@ func main() {
 			}
 
 			log.Printf("Got start run command with run number %d and duration %d:", runNumber, runDuration)
+			//listeningTimer := time.NewTimer(time.Duration(runDuration) * time.Second)
+			//log.Printf("StartRunCmd: listeningTimer address: %p", listeningTimer)
 			if runReady {
 				runReady = false
 				log.Println("Starting data logging...")
-				go startHarvestersForRun(runDuration, runNumberString, sendInterval, dataSaveDir)
+				go startHarvestersForRun(runDuration, runNumberString, sendInterval, dataSaveDir, udpStatusConn)
 
 			} else {
 				log.Println("Data run already running.")
 			}
 
-		case startDataForwardingCmd:
+		case config.Commands.StopRunCmd:
+			log.Println("StopRunCmd: Hola!")
+			/*log.Printf("StopRunCmd: listeningTimer address: %p", listeningTimer)
+			if !runReady {
+				log.Println("StopRunCmd: Stopping data logging...")
+				if listeningTimer.Stop() {
+					log.Println("StopRunCmd: Sent code")
+					netutils.SendStatusCode(udpStatusConn, config.Status.Ended_manually)
+				} else {
+
+					log.Println("StopRunCmd: Timer already stopped.")
+				}
+			} else {
+				log.Println("StopRunCmd: No run to stop.")
+			}*/
+
+			/*log.Println("StopRunCmd: Hola!")
+			if !runReady {
+				log.Println("StopRunCmd: Stopping data logging...")
+				err := safeClose(stopListening)
+				log.Println("Got this error:", err)
+				if err != nil {
+					log.Println("StopRunCmd: Channel already closed.")
+				} else {
+					netutils.SendStatusCode(udpStatusConn, config.Status.Ended_manually)
+				}
+			} else {
+				log.Println("StopRunCmd: No run to stop.")
+			}*/
+
+		case config.Commands.StartDataForwardingCmd:
 			listenIP := receivedMap["listenIP"].(string)
 			forwardIP := receivedMap["forwardIP"].(string)
 			log.Printf("Got start data forwarding command with listen IP %s and forward IP %s:", listenIP, forwardIP)
 			go netutils.StartDataForwarding(listenIP, forwardIP, stopForwarding)
 
-		case stopDataForwardingCmd:
+		case config.Commands.StopDataForwardingCmd:
 			stopForwarding <- struct{}{}
 			log.Println("Stopping data forwarding...")
 
-		case exitCmd:
-			fmt.Println("Exiting server...")
+		case config.Commands.ExitCmd:
+			log.Println("Exiting server...")
 			return
-		case testCmd:
-			fmt.Println("Got Test!!")
-		case hearbeatCmd:
+		case config.Commands.TestCmd:
+			log.Println("Got Test!!")
+		case config.Commands.HearbeatCmd:
 			//fmt.Println("Got Heartbeat!!")
 			_, _ = udpHeartbeatConn.Write([]byte("Heartbeat"))
 		default:
-			fmt.Println("What!?")
+			log.Println("What!?")
 
 		}
 
@@ -186,13 +256,15 @@ func resetStart() {
 	runReady = true
 }
 
-func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint32, dataSaveDir string) {
+func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint32, dataSaveDir string, udpStatusConn *net.UDPConn) {
 
 	defer resetStart()
 
 	startListening := make(chan struct{})
-	listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
 	stopListening := make(chan struct{})
+	listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
+	//listeningTimer.Reset(time.Duration(duration) * time.Second)
+
 	telescopes := state.GetTelescopesPresentInt(&globalState)
 	eventBuilderChannels := make([]chan eventBuilderData, len(telescopes)) // One per telescope.
 	for i := range eventBuilderChannels {
@@ -237,10 +309,20 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 	}
 	defer udpGUIConn.Close()
 	go guiListener(udpGUIConn, guiChannel)
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 	close(startListening)
+
+	_ = netutils.SendStatusCode(udpStatusConn, config.Status.Started)
+
+	log.Printf("startHarvestersForRun: listeningTimer address: %p", listeningTimer)
 	<-listeningTimer.C
 	close(stopListening)
+	/*err := safeClose(stopListening)
+	if err != nil {
+		log.Println("startHarvestersForRun: Channel already closed.")
+	} else {
+		netutils.SendStatusCode(udpStatusConn, config.Status.Ended)
+	}*/
 	//for _, ch := range eventBuilderChannels {
 	//	close(ch)
 	//}
@@ -259,7 +341,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 		}
 	}()*/
 
-	fmt.Printf("Starting event builder for telescope %d\n", telescope)
+	//log.Printf("Starting event builder for telescope %d\n", telescope)
 	pixelValuesPadded := [560]float64{} // This has 60 empty channels spread throughout the array.
 	emptyBuf := [308]byte{}
 	eventBuilderData := eventBuilderData{Source: harvesterID{Harvester: 0, Telescope: 0}, Data: emptyBuf}
@@ -307,7 +389,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 				pixelValues := data_parsing.ExtractRelevantPixels(pixelValuesPadded)
 				guiData := telescopeData{Telescope: eventBuilderData.Source.Telescope, Data: pixelValues}
 				guiChannel <- guiData
-				//fmt.Printf("Sent data to GUI\n")
+				fmt.Printf("Sent data to GUI\n")
 				pixelValuesPadded = [560]float64{}
 				harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
 				j = 0
@@ -344,7 +426,7 @@ func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
 		}
 		telescopesPresent[thisTelescope-1] = true
 		if state.AllTelescopes(telescopesPresent) {
-			fmt.Printf("Sending this data to the GUI:\n")
+			//fmt.Printf("Sending this data to the GUI:\n")
 			_, _ = udpGUIConn.Write(outGoingData)
 			telescopesPresent, _ = state.GetTelescopesMissingBool(&globalState)
 			// Drain/flush/clear the channel

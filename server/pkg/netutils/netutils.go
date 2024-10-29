@@ -1,6 +1,7 @@
 package netutils
 
 import (
+	"encoding/binary"
 	"log"
 	"net"
 )
@@ -35,6 +36,18 @@ func EstablishUDPConnectionForWrite(ipPort string) (*net.UDPConn, error) {
 		return nil, err
 	}
 	return udpConn, nil
+}
+
+func SendStatusCode(udpStatusConn *net.UDPConn, statusCode int) error {
+	statusBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(statusBytes, uint32(statusCode))
+
+	_, err := udpStatusConn.Write(statusBytes)
+	if err != nil {
+		log.Printf("Error sending running status: %v", err)
+		return err
+	}
+	return nil
 }
 
 // startDataForwarding starts forwarding data from a listening IP address to a forwarding IP address.
