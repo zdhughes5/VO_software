@@ -31,6 +31,7 @@ type Config struct {
 	GuiHeartbeatConnIP  string   `json:"guiHeartbeatConnIP"`
 	GuiStatusConnIP     string   `json:"guiStatusConnIP"`
 	DataSavePath        string   `json:"dataSavePath"`
+	SendInterval        int      `json:"sendInterval"`
 	Commands            Commands `json:"commands"`
 	Status              Status   `json:"status"`
 }

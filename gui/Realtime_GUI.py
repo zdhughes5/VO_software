@@ -242,7 +242,7 @@ class VeritasSQLPingWorker(QtCore.QThread):
             
             crs.execute(query)
             result = crs.fetchone()
-            print(result)
+            #print(result)
             crs.close()
             dbcnx.close()
             self.result_signal.emit(bool(result))
@@ -379,6 +379,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.w3.disableAutoRange()
         self.w4.disableAutoRange()
         #w5.disableAutoRange(axis=0)
+        self.firstFlip = False
 
 
         self.roi1.sigRegionChanged.connect(self.updateROI)
@@ -386,7 +387,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.updateROI(self.roi1)
         
         self.StartButton.clicked.connect(self.startRun)
-        self.StopButton.clicked.connect(self.stopRun)
+        self.StopButton.clicked.connect(self.send_stop_message)
         self.s1.scene().sigMouseMoved.connect(self.onMouseMoved)
 
 
@@ -410,6 +411,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.actionLoad_state_file.triggered.connect(self.load_state_file)
         #self.actionLoad_config_file.triggered.connect(self.load_config_file)
         self.state_edit_check.toggled.connect(self.toggle_state_edit)  # Connect the checkbox to the function
+        self.state_edit_check_was_checked = self.state_edit_check.isChecked()  # Store the initial state of the checkbox
         self.state_edit_set_button.clicked.connect(self.set_changes)
         self.state_edit_undo_button.clicked.connect(self.undo_changes)
 
@@ -447,6 +449,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.obs_params_veritas_runid_query_button.clicked.connect(self.query_veritas_sql)
 
         self.VO_db_params = {
+            'run_id': '',
             'veritas_run_id': '',
             'run_type': '',
             'run_status': '',
@@ -461,6 +464,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             'source_id': ''
         }
         self.VO_db_params_filled = {
+            'run_id': False,
             'veritas_run_id': False,
             'run_type': False,
             'run_status': False,
@@ -474,10 +478,14 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             'harvester_mask': False,
             'source_id': False
         }
+
+
         self.read_last_run_id()
 
         self.test_button.clicked.connect(self.dump_VO_db_params)
 
+
+        self.VO_db_params_runid_line.textChanged.connect(self.update_VO_db_params)
         self.VO_db_params_vrunid_line.textChanged.connect(self.update_VO_db_params)
         self.VO_db_params_run_type_line.textChanged.connect(self.update_VO_db_params)
         self.VO_db_params_run_status_line.textChanged.connect(self.update_VO_db_params)
@@ -499,9 +507,136 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.fadc_gate_array_window_set_button.clicked.connect(self.set_fadc_gate_array_window)
 
         self.send_stop_button.clicked.connect(self.send_stop_message)
+        self.StartButton.clicked.connect(self.request_listen)
+
+        self.harvester_command_c001_button.clicked.connect(lambda: self.send_harvester_packet('c001', log=True))
+        self.harvester_command_c002_button.clicked.connect(lambda: self.send_harvester_packet('c002', log=True))
+        self.harvester_command_c003_button.clicked.connect(lambda: self.send_harvester_packet('c003', log=True))
+        self.harvester_command_c004_button.clicked.connect(lambda: self.send_harvester_packet('c004', log=True))
+        
+        # Initialize the timer
+        self.harvester_timer = QtCore.QTimer(self)
+        self.harvester_timer.timeout.connect(lambda: self.send_harvester_packet('c004'))
+        
+        self.harvester_command_start_time_pulse_button.clicked.connect(self.start_harvester_timer)
+        self.harvester_command_stop_time_pulse_button.clicked.connect(self.stop_harvester_timer)
+    
+
+    def start_harvester_timer(self):
+        self.harvester_timer.start(1000)  # Start the timer with a 1-second interval
+        self.harvester_command_time_status_label.setStyleSheet("background-color: green; color: white;")
+        self.harvester_command_time_status_label.setText("Active")
+    
+    def stop_harvester_timer(self):
+        self.harvester_timer.stop()  # Stop the timer
+        self.harvester_command_time_status_label.setStyleSheet("background-color: yellow; color: black;")
+        self.harvester_command_time_status_label.setText("Inactive")
+
+
+    def send_harvester_packet(self, command, log=False):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        try:
+            # Define the host and port from the configuration
+            host = QHostAddress(self.config_data['harvesterControlConnIP'].split(':')[0])
+            port = int(self.config_data['harvesterControlConnIP'].split(':')[1])
+            
+            # Prepare the data to be sent
+            if command == 'c004':
+                hex_timestamp = self.get_hex_timestamp()
+                big_send = True
+            else:
+                big_send = False
+            
+            if big_send:
+                hex_timestamp = int(hex_timestamp, 16)
+                datum = struct.pack('>HI', int(command, 16), hex_timestamp)
+            else:
+                datum = struct.pack('>HI', int(command, 16), 0)
+            
+            # Send the datagram using self.heartbeatSocket
+            self.heartbeatSocket.writeDatagram(datum, host, port)
+            if log:
+                logger.log(logging.INFO, f'Sent datagram: {datum}', extra=extra)
+        except Exception as e:
+            logger.log(logging.ERROR, f'Failed to send UDP packet: {e}', extra=extra)
+    
+    def get_hex_timestamp(self):
+        timestamp = int(time.time())
+        return hex(timestamp)[2:]
+
+    def get_VO_db_params_filled_short(self):
+        return {key: self.VO_db_params_filled[key] for key in ['run_id', 'veritas_run_id', 'run_type', 'run_window', 'duration', 'telescope_mask', 'harvester_mask', 'source_id']}
+
+    def request_listen(self):
+        # Create data_map with parameters from VO_db_params and self.config_data
+        data_map = {
+            "command": int(self.config_data['commands']['startRunCmd']),
+            "runNumber": int(self.VO_db_params['run_id']),
+            "duration": int(self.VO_db_params['duration']),
+            "sendInterval": int(self.config_data['sendInterval']),
+            "dataSaveDir": self.config_data['dataSavePath'],
+            "state": json.dumps(self.state_data)  # Use self.state_data instead of reading the state.json file
+        }
+
+        # Convert map to JSON
+
+
+
+        try:
+            json_data = json.dumps(data_map)
+        except json.JSONEncodeError as err:
+            print(f"Error marshaling JSON: {err}")
+            return
+
+        #print(f"command is type {type(data_map['command'])}")
+
+        server_control_ip, server_control_port = self.config_data['serverControlConnIP'].split(':')
+        server_control_port = int(server_control_port)
+
+        datagram = json_data.encode()
+
+        try:
+            self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
+        except Exception as err:
+            print(f"Error sending JSON over UDP: {err}")
+
+
+
+    def execute_binary_over_ssh(self, hostname, username, binary_path, argument):
+        """
+        Executes a binary on a remote server over SSH.
+
+        :param hostname: The hostname or IP address of the remote server.
+        :param username: The username for the SSH connection.
+        :param binary_path: The path to the binary on the remote server.
+        :param argument: The command line argument to pass to the binary.
+        """
+        try:
+            # Construct the SSH command
+            ssh_command = f"ssh {username}@{hostname} '{binary_path} {argument}'"
+            
+            # Execute the command
+            process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Read the output and error streams
+            output, error = process.communicate()
+            
+            # Decode the output and error
+            output = output.decode()
+            error = error.decode()
+            
+            # Log the output and errors
+            if output:
+                logger.info(f"Output: {output}")
+            if error:
+                logger.error(f"Error: {error}")
+            
+        except Exception as e:
+            logger.error(f"Failed to execute binary over SSH: {str(e)}")
 
     def set_fadc_gate_array_window(self):
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
+        #self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/zdhughes/c_ether/server_FADC', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
 
     def set_current_datetime(self):
         self.VO_db_params_run_status_line.setText('ended')
@@ -513,7 +648,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def write_VO_db_params_to_db(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        if not self.check_VO_db_params_filled():
+        if not self.check_VO_db_params_filled(self.VO_db_params):
             logger.log(logging.WARNING, "Not all VO DB parameters are filled.", extra=extra)
             return
 
@@ -563,8 +698,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 connection.close()
                 logger.log(logging.INFO, "Database connection closed", extra=extra)
 
-    def check_VO_db_params_filled(self):
-        for key, value in self.VO_db_params_filled.items():
+    def check_VO_db_params_filled(self, dictionary):
+        for key, value in dictionary.items():
             if not value:
                 return False
         return True
@@ -576,6 +711,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def update_VO_db_params(self):
+        self.VO_db_params['run_id'] = self.VO_db_params_runid_line.text()
         self.VO_db_params['veritas_run_id'] = self.VO_db_params_vrunid_line.text()
         self.VO_db_params['run_type'] = self.VO_db_params_run_type_line.text()
         self.VO_db_params['run_status'] = self.VO_db_params_run_status_line.text()
@@ -589,6 +725,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.VO_db_params['harvester_mask'] = self.VO_db_params_harvester_mask_line.text()
         self.VO_db_params['source_id'] = self.VO_db_params_sourceid_line.text()
         self.flag_VO_db_params_filled()
+        if not self.firstFlip and self.check_VO_db_params_filled(self.get_VO_db_params_filled_short()):
+            self.firstFlip = True
+            self.StartButton.setEnabled(True)
+
+
 
 
     def dump_VO_db_params(self):
@@ -653,7 +794,6 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.server_process:
             try:
                 os.kill(self.server_process.pid, 0)
-                print('beep')
             except OSError or ProcessLookupError:
                 logger.log(logging.INFO, f"Server process with PID {self.server_process.pid} has been terminated (OSError).", extra=extra)
                 self.server_process = None
@@ -723,13 +863,79 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         datagram = self.statusSocket.receiveDatagram(8000)
         status_code = struct.unpack('>I', datagram.data())[0]  # '>I' for big-endian unsigned int
-        print(self.config_data["status"])
+        #print(self.config_data["status"])
         statuses = self.invert_dict(self.config_data["status"])
         status_key = self.get_key_from_value(statuses, status_code)
 
         logger.log(logging.INFO, f"Received status: {status_code}, corresponding to {status_key}", extra=extra)
         
         # Now you can compare status_code with the value in the JSON file
+
+        #for key, value in self.config_data["status"].items():
+        #    print(f"key: {key}, value: {value}, type: {type(value)}")
+            
+        #print('status_key:', status_key, type(status_key))
+        #print('self.config_data["status"]["started"]:', self.config_data["status"]["started"])
+        if status_code == self.config_data["status"]["started"]:
+            self.VO_db_params_run_status_line.setText(status_key)
+            self.VO_db_params_db_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.VO_db_params_data_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.VO_db_params_db_end_time_line.setText('null')
+            self.VO_db_params_data_end_time_line.setText('null')
+            self.VO_db_params_filled['db_end_time'] = False
+            self.VO_db_params_filled['data_end_time'] = False
+            self.set_gui_components_enabled(False)
+        elif status_code == self.config_data["status"]["aborted"]:
+            self.VO_db_params_run_status_line.setText(status_key)
+            self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.set_gui_components_enabled(True)
+        elif status_code == self.config_data["status"]["ended"]:
+            self.VO_db_params_run_status_line.setText(status_key)
+            self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.set_gui_components_enabled(True)
+            self.write_VO_db_params_to_db()
+        elif status_code == self.config_data["status"]["ended_manually"]:
+            self.VO_db_params_run_status_line.setText(status_key)
+            self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            self.set_gui_components_enabled(True)
+            self.write_VO_db_params_to_db()
+        else:
+            logger.log(logging.WARNING, f"Received unknown status: {status_code}", extra=extra)
+
+    def set_gui_components_enabled(self, enabled):
+        if not enabled:
+            # If disabling, check the state of self.state_edit
+            if self.state_edit_check_was_checked:
+                self.toggle_state_edit(False)  # Disable the state boxes
+                self.state_edit_check_was_checked = True
+            else:
+                self.state_edit_check_was_checked = False
+            self.state_edit_check.setEnabled(False)
+            self.state_edit_undo_button.setEnabled(False)
+            self.state_edit_set_button.setEnabled(False)
+
+        else:
+            # If enabling, check the previous state stored in self.state_edit_check_was_checked
+            self.toggle_state_edit(self.state_edit_check_was_checked)  # Re-enable the state boxes
+            self.state_edit_check.setEnabled(True)
+            self.state_edit_undo_button.setEnabled(True)
+            self.state_edit_set_button.setEnabled(True)
+
+        # Enable or disable the other components
+        self.obs_params_undo_button.setEnabled(enabled)
+        self.obs_params_set_button.setEnabled(enabled)
+        self.obs_params_save_path_line.setEnabled(enabled)
+        self.obs_params_sourceid_line.setEnabled(enabled)
+        self.obs_params_veritas_runid_spin.setEnabled(enabled)
+        self.obs_params_veritas_runid_query_button.setEnabled(enabled)
+        self.obs_params_run_type_combo.setEnabled(enabled)
+        self.obs_params_duration_spin.setEnabled(enabled)
+        self.veritas_sql_ping_button.setEnabled(enabled)
+        self.fadc_gate_array_window_set_button.setEnabled(enabled)
+        self.fadc_gate_array_window_combo.setEnabled(enabled)
 
 
 
@@ -763,6 +969,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #print(f"Sent heartbeat to {server_heartbeat_ip}:{server_heartbeat_port} with message: {heartbeat_message}")
 
     def send_stop_message(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
         server_control_port = int(server_control_port)
 
@@ -770,7 +977,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         stop_message = json.dumps({"command": 8})
         datagram = stop_message.encode()
 
-        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
+        self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port) 
+        logger.log(logging.INFO, 'Run Stop requested.', extra=extra)  
 
     def load_config_file(self):
         try:
@@ -982,6 +1190,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 getattr(self, f't{i}_state_channel_end_spin_{j}').setEnabled(checked)
                 getattr(self, f't{i}_state_pixel_index_start_spin_{j}').setEnabled(checked)
                 getattr(self, f't{i}_state_pixel_index_end_spin_{j}').setEnabled(checked)
+        self.state_edit_check_was_checked = checked
 
     def mark_widget_as_modified(self, widget, original_value):
         current_value = None
@@ -1283,7 +1492,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def stopRun(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        logger.log(logging.INFO, 'Run Stopped.', extra=extra)        
+        logger.log(logging.INFO, 'Run Stop requested.', extra=extra)       
         
     def updateROI(self, roi):
         

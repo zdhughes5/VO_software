@@ -3,7 +3,9 @@
     "guiDataConnIP": "127.0.0.1:31255",
     "guiHeartbeatConnIP": "127.0.0.1:31256",
     "guiStatusConnIP": "127.0.0.1:31257",
+    "harvesterControlConnIP": "192.168.100.100:5000",
     "dataSavePath": "/home/zdhughes/optical_data/",
+    "sendInterval": 300,
     "commands": {
         "nothing": 0,
         "startRunCmd": 1,

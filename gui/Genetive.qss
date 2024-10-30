@@ -30,6 +30,13 @@ QPushButton {
 	font-weight: bold;
 }
 
+QPushButton:disabled 
+{
+	background-color: #4e4e4e;
+
+}
+
+
 /* Specific style for StartButton */
 QPushButton#StartButton {
     font-weight: bold;
@@ -37,12 +44,27 @@ QPushButton#StartButton {
     color: rgb(0, 170, 0);
 }
 
+QPushButton#StartButton:disabled {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(140, 170, 140);
+}
+
+
+
 /* Specific style for StopButton */
 QPushButton#StopButton {
     font-weight: bold;
     font-size: 35px;
     color: rgb(170, 0, 0);
 }
+
+QPushButton#StopButton:disabled {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(170, 140, 140);
+}
+
 
 /*-----QWidget-----*/
 QWidget
@@ -276,7 +298,8 @@ QToolButton:checked
 
 QToolButton:disabled 
 {
-	color: #4e4e4e;
+	/*color: #4e4e4e;*/
+
 
 }
 
