@@ -679,8 +679,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 datetime.strptime(self.VO_db_params['data_start_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
                 datetime.strptime(self.VO_db_params['data_end_time'], '%Y-%m-%d %H:%M:%S'),  # timestamp without time zone
                 self.VO_db_params['duration'],  # interval
-                self.VO_db_params['telescope_mask'],  # integer
-                self.VO_db_params['harvester_mask'],  # integer
+                int(self.VO_db_params['telescope_mask']),  # integer
+                int(self.VO_db_params['harvester_mask']),  # integer
                 self.VO_db_params['source_id']  # character varying(255)
             )
             cursor.execute(insert_query, run_data)
