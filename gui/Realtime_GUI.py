@@ -649,7 +649,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             error = error.decode()
 
             if output == '':
-                logger.log(logging.WARNING, f'Got no output from set_variance. Porbably timed out. Did the window really get set?', extra=extra)
+                logger.log(logging.WARNING, f'Got no output from set_variance. Probably timed out. Did the window really get set?', extra=extra)
             
             # Log the output and errors
             if output:
