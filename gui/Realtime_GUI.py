@@ -1432,10 +1432,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
     def getDatagramAndQueue(self):
         # Flush the socket
         while self.listenSocket.hasPendingDatagrams():
-            self.listenSocket.receiveDatagram(8000)
+            datagram = self.listenSocket.receiveDatagram(8000)
 
         # Now receive the latest datagram
-        datagram = self.listenSocket.receiveDatagram(8000)
+        #datagram = self.listenSocket.receiveDatagram(8000)
         pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
         self.pixelData = pixelData
         #print(self.pixelData)
