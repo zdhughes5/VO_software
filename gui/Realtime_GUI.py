@@ -21,7 +21,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from time import perf_counter
 from pyqtgraph.Qt.QtGui import QBrush, QColor
 from ast import literal_eval as  le
-from PyQt6.QtNetwork import QHostAddress, QUdpSocket
+from PyQt6.QtNetwork import QHostAddress, QUdpSocket, QNetworkDatagram
 import sys
 from time import sleep
 import logging
@@ -336,7 +336,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.ptr1 = -1000
         self.colormap = pg.colormap.get('CET-CBL2')
         self.valueRange = np.linspace(0, 66000, num=self.nPts)
-        #self.valueRange = np.linspace(0, 255, num=self.nPts)
+        self.valueRange = np.linspace(0, 5000, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
         
@@ -349,9 +349,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pixelTimeSeriesDataCurve3 = pg.PlotCurveItem(self.pixelTimeSeriesData3, pen=(0,255,0), antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve4 = pg.PlotCurveItem(self.pixelTimeSeriesData4, pen=(0,0,255), antialias=False, skipFiniteCheck=True)
         self.w5.addItem(self.pixelTimeSeriesDataCurve1)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve2)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve3)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve4)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve2)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve3)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve4)
 
         thick_pen = pg.mkPen((255, 0, 0), width=3)
         self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, handlePen=thick_pen)
@@ -538,8 +538,14 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         try:
             # Define the host and port from the configuration
-            host = QHostAddress(self.config_data['harvesterControlConnIP'].split(':')[0])
-            port = int(self.config_data['harvesterControlConnIP'].split(':')[1])
+            #host = QHostAddress(self.config_data['harvesterControlConnIP'].split(':')[0])
+            #port = int(self.config_data['harvesterControlConnIP'].split(':')[1])
+            #host = QHostAddress.SpecialAddress.Broadcast
+            host = QHostAddress('255.255.255.255')
+            port = 5000
+            socket = QUdpSocket()
+            logger.log(logging.INFO, f'HOST IS BROADCAST: {QHostAddress.isBroadcast(host)}', extra=extra)
+
             
             # Prepare the data to be sent
             if command == 'c004':
@@ -555,9 +561,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 datum = struct.pack('>HI', int(command, 16), 0)
             
             # Send the datagram using self.heartbeatSocket
-            self.heartbeatSocket.writeDatagram(datum, host, port)
+            datagram = QNetworkDatagram()
+            datagram.setDestination(host, port)
+            datagram.setHopLimit(255)
+            datagram.setData(datum)
+            nSent = socket.writeDatagram(datagram)
             if log:
-                logger.log(logging.INFO, f'Sent datagram: {datum}', extra=extra)
+                logger.log(logging.INFO, f'Sent datagram of size {nSent} and contents: {datum}', extra=extra)
         except Exception as e:
             logger.log(logging.ERROR, f'Failed to send UDP packet: {e}', extra=extra)
     
@@ -614,7 +624,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         """
         try:
             # Construct the SSH command
-            ssh_command = f"ssh {username}@{hostname} '{binary_path} {argument}'"
+            ssh_command = f"ssh -t {username}@{hostname} '{binary_path} {argument}'"
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            logger.log(logging.INFO, f'Sent request: {ssh_command}', extra=extra)
             
             # Execute the command
             process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -628,16 +640,16 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             
             # Log the output and errors
             if output:
-                logger.info(f"Output: {output}")
+                logger.log(logging.INFO, f'Output: {output}', extra=extra)
             if error:
-                logger.error(f"Error: {error}")
+                logger.log(logging.ERROR, f'Error (unless it is a closed connection): {error}', extra=extra)
             
         except Exception as e:
-            logger.error(f"Failed to execute binary over SSH: {str(e)}")
+            logger.log(logging.ERROR, f"Failed to execute binary over SSH: {str(e)}", extra=extra)
 
     def set_fadc_gate_array_window(self):
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
-        #self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/zdhughes/c_ether/server_FADC', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
+        self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
 
     def set_current_datetime(self):
         self.VO_db_params_run_status_line.setText('ended')
