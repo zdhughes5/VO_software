@@ -336,7 +336,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.ptr1 = -1000
         self.colormap = pg.colormap.get('CET-CBL2')
         self.valueRange = np.linspace(0, 66000, num=self.nPts)
-        #self.valueRange = np.linspace(0, 5000, num=self.nPts)
+        self.valueRange = np.linspace(0, 5000, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
         
@@ -349,9 +349,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pixelTimeSeriesDataCurve3 = pg.PlotCurveItem(self.pixelTimeSeriesData3, pen=(0,255,0), antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve4 = pg.PlotCurveItem(self.pixelTimeSeriesData4, pen=(0,0,255), antialias=False, skipFiniteCheck=True)
         self.w5.addItem(self.pixelTimeSeriesDataCurve1)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve2)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve3)
-        self.w5.addItem(self.pixelTimeSeriesDataCurve4)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve2)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve3)
+        #self.w5.addItem(self.pixelTimeSeriesDataCurve4)
 
         thick_pen = pg.mkPen((255, 0, 0), width=3)
         self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, handlePen=thick_pen)
