@@ -334,9 +334,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #self.nPts = 255
         self.nPts = 255
         self.ptr1 = -1000
+        self.pixelMax = 66000
         self.colormap = pg.colormap.get('CET-CBL2')
-        self.valueRange = np.linspace(0, 66000, num=self.nPts)
-        self.valueRange = np.linspace(0, 5000, num=self.nPts)
+        self.valueRange = np.linspace(0, self.pixelMax, num=self.nPts)
+        self.valueRangeLog = np.logspace(0, np.log10(self.pixelMax), num=self.nPts)
+        np.insert(self.valueRangeLog, 0, 0.0)
+        #self.valueRange = np.linspace(0, 5000, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
         
@@ -1451,10 +1454,16 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
        # print(self.pixelData)
         
         #self.pixelData = np.random.randint(0, 63508, size=2000)
-        self.brushes1 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[:499])]
-        self.brushes2 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[500:999])]
-        self.brushes3 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[1000:1499])]
-        self.brushes4 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[1500:1999])]
+        if self.data_display_log_check.isChecked():
+            self.brushes1 = self.colors2[np.searchsorted(self.valueRangeLog, self.pixelData[:499])]
+            self.brushes2 = self.colors2[np.searchsorted(self.valueRangeLog, self.pixelData[500:999])]
+            self.brushes3 = self.colors2[np.searchsorted(self.valueRangeLog, self.pixelData[1000:1499])]
+            self.brushes4 = self.colors2[np.searchsorted(self.valueRangeLog, self.pixelData[1500:1999])]
+        else:
+            self.brushes1 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[:499])]
+            self.brushes2 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[500:999])]
+            self.brushes3 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[1000:1499])]
+            self.brushes4 = self.colors2[np.searchsorted(self.valueRange, self.pixelData[1500:1999])]
     
         self.s1.setBrush(self.brushes1) # Is there a faster way to do this?
         self.s2.setBrush(self.brushes2)
