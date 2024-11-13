@@ -336,7 +336,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.ptr1 = -1000
         self.colormap = pg.colormap.get('CET-CBL2')
         self.valueRange = np.linspace(0, 66000, num=self.nPts)
-        self.valueRange = np.linspace(0, 5000, num=self.nPts)
+        #self.valueRange = np.linspace(0, 5000, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
         
@@ -349,9 +349,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pixelTimeSeriesDataCurve3 = pg.PlotCurveItem(self.pixelTimeSeriesData3, pen=(0,255,0), antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve4 = pg.PlotCurveItem(self.pixelTimeSeriesData4, pen=(0,0,255), antialias=False, skipFiniteCheck=True)
         self.w5.addItem(self.pixelTimeSeriesDataCurve1)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve2)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve3)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve4)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve2)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve3)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve4)
 
         thick_pen = pg.mkPen((255, 0, 0), width=3)
         self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, handlePen=thick_pen)
@@ -521,6 +521,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.harvester_command_start_time_pulse_button.clicked.connect(self.start_harvester_timer)
         self.harvester_command_stop_time_pulse_button.clicked.connect(self.stop_harvester_timer)
+
+        self.sample_average = 1
+
+        self.data_display_sample_button.clicked.connect(self.update_sample_average)
+
+    def update_sample_average(self):
+        self.sample_average = self.data_display_sample_spin.value()
     
 
     def start_harvester_timer(self):
@@ -629,7 +636,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             logger.log(logging.INFO, f'Sent request: {ssh_command}', extra=extra)
             
             # Execute the command
-            process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,  preexec_fn=lambda: signal.alarm(5))
             
             # Read the output and error streams
             output, error = process.communicate()
@@ -637,6 +644,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             # Decode the output and error
             output = output.decode()
             error = error.decode()
+
+            if output == '':
+                logger.log(logging.WARNING, f'Got no output from set_variance. Porbably timed out. Did the window really get set?', extra=extra)
             
             # Log the output and errors
             if output:
@@ -1420,6 +1430,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def getDatagramAndQueue(self):
+        # Flush the socket
+        while self.listenSocket.hasPendingDatagrams():
+            self.listenSocket.receiveDatagram(8000)
+
+        # Now receive the latest datagram
         datagram = self.listenSocket.receiveDatagram(8000)
         pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
         self.pixelData = pixelData
@@ -1466,10 +1481,22 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pixelTimeSeriesData4 = np.roll(self.pixelTimeSeriesData4, -1)
         
         if len(self.selected) != 0:
-            self.pixelTimeSeriesData1[-1] = np.average(self.pixelData[:499][self.selected])
-            self.pixelTimeSeriesData2[-1] = np.average(self.pixelData[500:999][self.selected])
-            self.pixelTimeSeriesData3[-1] = np.average(self.pixelData[1000:1499][self.selected])
-            self.pixelTimeSeriesData4[-1] = np.average(self.pixelData[1500:1999][self.selected])
+            if self.sample_average == 1:
+                self.pixelTimeSeriesData1[-1] = np.average(self.pixelData[:499][self.selected])
+                self.pixelTimeSeriesData2[-1] = np.average(self.pixelData[500:999][self.selected])
+                self.pixelTimeSeriesData3[-1] = np.average(self.pixelData[1000:1499][self.selected])
+                self.pixelTimeSeriesData4[-1] = np.average(self.pixelData[1500:1999][self.selected])
+            else:
+                self.pixelTimeSeriesData1[-1] = np.average(self.pixelData[:499][self.selected])
+                self.pixelTimeSeriesData2[-1] = np.average(self.pixelData[500:999][self.selected])
+                self.pixelTimeSeriesData3[-1] = np.average(self.pixelData[1000:1499][self.selected])
+                self.pixelTimeSeriesData4[-1] = np.average(self.pixelData[1500:1999][self.selected])
+
+                # Calculate the average of the last N values including the current one
+                self.pixelTimeSeriesData1[-1] = np.average(self.pixelTimeSeriesData1[-self.sample_average:])
+                self.pixelTimeSeriesData2[-1] = np.average(self.pixelTimeSeriesData2[-self.sample_average:])
+                self.pixelTimeSeriesData3[-1] = np.average(self.pixelTimeSeriesData3[-self.sample_average:])
+                self.pixelTimeSeriesData4[-1] = np.average(self.pixelTimeSeriesData4[-self.sample_average:])
         else:
             self.pixelTimeSeriesData1[-1] = 0
             self.pixelTimeSeriesData2[-1] = 0
