@@ -1,0 +1,6 @@
+2001-09-24  Karl Kosack  <kosack@fadc.wustl.edu>
+
+	* testfadc.c: added pulse analysis functions and display for values
+
+	* testfadc.c: New version now works with libfadc and Linux
+

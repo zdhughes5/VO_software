@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+
+$WORK = 'workhere';
+
+mkdir($WORK) if (!(-d $WORK));
+mkdir("bin") if (!(-d "bin"));
+
+chdir($WORK) or die "Couldn't change dir to '$WORK'";
+foreach (<../settings/*.settings>) {
+    
+    `ln -s $_ .`;
+
+}

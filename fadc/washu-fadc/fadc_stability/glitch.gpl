@@ -1,0 +1,10 @@
+# GNUPLOT file for plotting glitch.dat
+
+set title "Possible Glitches"
+set xlabel "Sample number"
+set ylabel "Value (D.C.)"
+set grid
+plot  'goodpulses.dat' w lines 2 , "glitch.dat" with lines 1
+
+pause 5
+reread

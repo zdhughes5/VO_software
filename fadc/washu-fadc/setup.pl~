@@ -1,0 +1,8 @@
+#!/usr/bin/perl
+
+
+# set up workhere directory
+
+if (-d "workhere") {
+    print "EXISTS\n";
+}

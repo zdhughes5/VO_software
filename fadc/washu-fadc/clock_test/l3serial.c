@@ -1,0 +1,242 @@
+/*
+      l3serial.c                                                    
+      1/9/06
+                                                               
+      Test routines for the L3 Serial board testing  
+      
+      Hardware notes:
+
+      This version uses A32 bit addressing and D32 bit data transfers.
+
+      VME memory-mapped I/O window set to 0xf0f00000 - 0xf0ffffff.
+      Window address set in libfadc.c and initialized
+      at bootup in vme program. 
+
+      L3 Serial board mapped to 0xf0fd0000 (A32)
+*/
+
+#include <vme/vme_api.h>
+#include <fadc.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <termios.h>
+#include <fadc_lowlevel.h>          /* macros for fadc board   */
+
+#include "kb.h"
+
+
+int main(void)
+{
+    unsigned long *l3serial_lptr;   /* pointer for D32 CLKBD transfers    */
+    unsigned long *lptr;
+    int c, quit;
+    unsigned long status, j;
+    unsigned long evt_no, t1_evt_type, t2_evt_type, trig_mask;
+
+    fadc_init();
+    fadc_verbose(1);    
+
+    atexit(fadc_exit);
+
+    l3serial_lptr = fadc_get_l3serial_lptr();
+    evt_no = 1;
+    t1_evt_type = 0;
+    t2_evt_type = 0;
+    trig_mask = 0;
+
+    /* initialize board settings */
+    lptr = l3serial_lptr + 0x2001;   /* write prog board no */
+    *lptr = 55;    
+    lptr = l3serial_lptr + 0x2002;   /* write Amanda mode or diagnostic mode */
+    *lptr = 0x003F;/* bit 0: 0=Amanda's Event Type is latched */
+                   /*        1=software reg Event Type is latched */
+		   /* bit 1: 0=Amanda's TTL trig J51 input */
+		   /*        1=L3_trig from pulser J1 input */
+		   /* bit 2&3: 00=LED flashes Event_status */
+		   /*          01=LED flashes T2_Telescope_busy */
+		   /*          10=LED flashes T1_Telescope_busy */		   
+		   /*          11=LED flashes T1_OR_T2_Telescope_busy */		   
+		   /* bit 4&5: 00=TTL_Veto_Out driven by Event_status */
+		   /*          01=TTL_Veto_Out driven by T2_Telescope_busy */
+		   /*          10=TTL_Veto_Out driven by T1_Telescope_busy */
+		   /*          11=TTL_Veto_Out driven by T1_OR_T2_Telescope_busy */		   
+		   		   
+    printf("\n\n running in diagnostic Pulser mode: J1 input\n");
+
+    lptr = l3serial_lptr + 0x2000;   /* write event clear */
+    *lptr = 0;    
+
+    /* Display the menu */
+    set_keypress(0);
+    quit = 0;
+    while(!quit){
+	printf("_______________________________________________________\n");
+	printf(" L3 SERIAL BOARD TEST Menu:                             \n");
+	printf("     1. shift bit on event number    c. event clear  \n");
+	printf("     2. write event number           h. read Registers\n");
+	printf("     3. write event type/trig mode   t. read Status Reg\n");
+	printf("     4. incr Evt_type & Trig_mode    a. Amanda mode\n");
+	printf("     5. 140nS TTL pulse out J21      d. diagnostic pulser mode\n");
+	printf("     s. software trig                u. change T1, T2 veto out\n");
+	printf("     x. exit                         COMMAND: ");
+	fflush(stdout);
+	
+	//c = getkey();
+	c = getchar();
+
+	switch(c){
+	case 'x':
+	    printf("\n\n exiting program \n");
+	    quit = 1;
+	    break;
+	    
+	case 'u':
+	    printf("\n\n changing Veto out & LED display to T1 \n");
+            lptr = l3serial_lptr + 0x2002;   /* write diagnostic mode */
+//	    *lptr = 0x0017;  /* for T2 */
+	    *lptr = 0x002b;  /* for T1 */
+//	    *lptr = 0x003f;  /* for T1_OR_T2 */
+	    break;
+	    
+	case 't':  /* read clock board status */
+	  lptr = l3serial_lptr + 0x2007;
+	  status = *lptr;
+	  printf( "\n\nStatus word: 0x%08lx \n", status );    
+	  printf ("\tEvent Trigger  : %d \n", (int)(status & 0x1));	 
+	  printf ("\tBoard Busy     : %d \n", (int)(status & 0x2)>>1);	
+	  printf ("\tT2_Telescope Busy : %d \n", (int)(status & 0x4)>>2);
+	  printf ("\tT1_Telescope Busy: %d \n", (int)(j & 0x8)>>3);
+	  printf ("\tT1_OR_T2_Telescope Busy: %d \n", (int)(j & 0x10)>>4);
+	  break;
+	  
+	case 'c':  /* evt clr */
+	    lptr = l3serial_lptr + 0x2000; /* SOFT_EVT_CLR; */
+	    *lptr = 0;
+	    printf("\n\n evt clr command issued\n");    
+	    break;
+
+	case 'a':  /* write Amanda mode */
+            lptr = l3serial_lptr + 0x2002;  
+            *lptr = 0;   /* bit 0: 0=Amanda's Event Type is latched */
+                         /*        1=software reg Event Type is latched */
+		         /* bit 1: 0=Amanda's TTL trig J51 input */
+		         /*        1=L3_trig from pulser J1 input */
+		         /* bit 2: 0=LED flashes Event_status */
+		         /*        1=LED flashes Telescope_busy */
+			 /* bit 3: 0=TTL_Veto_Out driven by Event_status */
+		         /*        1=TTL_Veto_Out driven by Telescope_busy */
+	    printf("\n\n running in Amanda mode: J51 input\n");
+	    break;
+	    
+	case 'd':  /* write diagnostid (pulser) mode */
+            lptr = l3serial_lptr + 0x2002;  
+            *lptr = 3;   /* bit 0: 0=Amanda's Event Type is latched */
+                         /*        1=software reg Event Type is latched */
+		         /* bit 1: 0=Amanda's TTL trig J51 input */
+		         /*        1=L3_trig from pulser J1 input */
+		         /* bit 2: 0=LED flashes Event_status */
+		         /*        1=LED flashes Telescope_busy */
+			 /* bit 3: 0=TTL_Veto_Out driven by Event_status */
+		         /*        1=TTL_Veto_Out driven by Telescope_busy */
+	    printf("\n\n running in diagnostic Pulser mode: J1 input\n");
+	    break;
+	    
+
+	case 's':
+	    lptr = l3serial_lptr + 0x2006;
+	    *lptr = 0;
+	    printf("\n\n issued Software trig\n");
+	    break;
+	    	    
+	case '4':
+	    t1_evt_type = t1_evt_type + 1;
+	    if (t1_evt_type > 15)
+	       t1_evt_type = 0;
+	    t2_evt_type = t2_evt_type + 1;
+	    if (t2_evt_type > 15)
+	       t2_evt_type = 0;
+	    trig_mask = trig_mask + 1;
+	    if (trig_mask > 3)
+	       trig_mask = 0;
+	    printf("\n\n T1 Evt_type = %lx\n", t1_evt_type);
+	    printf(" T2 Evt_type = %lx\n", t2_evt_type);
+	    printf(" Trig_mask = %lx\n", trig_mask);
+	    break;
+	    
+	case '6':
+	    printf("\n\n not used\n");
+	    break;
+	    
+	case '5':
+	    lptr = l3serial_lptr + 0x2007;
+	    *lptr = 0;
+	    printf("\n\n issued 140nS TTL pulse out of J21 \n");
+	    break;
+	    
+	case 'h': /* read headers */
+            printf("\n\n read Registers: \n\n");
+            lptr = l3serial_lptr + 0x2000; 
+            j = *lptr;
+            printf("Start header  : 0x%08lx\n", j);
+            printf("\tSync Pattern   : 0x%lx \n", (j & 0xFFFF0000)>>16);
+            printf("\tProg Board Num : %d \n", (int)(j & 0xFF00)>>8);
+            printf("\tUnique ID      : %d \n", (int)(j & 0xFF));
+            lptr = l3serial_lptr + 0x2001;
+            j = *lptr;
+            printf("\nT1 Event number = %08lx    (%ld)\n", j, j);
+	    lptr = l3serial_lptr + 0x2002;
+            j = *lptr;
+            printf("T1 Evt_type & Trig_mode = %08lx\n", j);
+	    lptr = l3serial_lptr + 0x2003;
+            j = *lptr;
+            printf("T2 Event number = %08lx\n", j);
+	    lptr = l3serial_lptr + 0x2004;
+            j = *lptr;
+            printf("T2 Evt_type & Trig_mode = %08lx\n", j);
+	    lptr = l3serial_lptr + 0x2007;
+            j = *lptr;
+            printf("\nStatus Reg = %lx\n", j);	        
+            printf ("\tEvent Trigger : %d \n", (int)(j & 0x1));	 
+            printf ("\tBoard Busy    : %d \n", (int)(j & 0x2)>>1);	
+            printf ("\tT2_Telescope Busy: %d \n", (int)(j & 0x4)>>2);
+            printf ("\tT1_Telescope Busy: %d \n", (int)(j & 0x8)>>3);
+	    printf ("\tT1_OR_T2_Telescope Busy: %d \n", (int)(j & 0x10)>>4);
+	    break;
+
+	case '1': /* shift bit on event number */
+	    evt_no = evt_no << 1;
+            if (evt_no == 0) evt_no = 1;
+	    printf("\n\n Event number = %08lx\n", evt_no);
+	    break;
+
+	case '2': /* write event number */
+	    printf("\n\n Wrote %08lx Event Number into register\n", evt_no);
+	    lptr = l3serial_lptr + 0x2004;
+	    *lptr = evt_no;
+	    break;
+
+	case '3':
+            lptr = l3serial_lptr + 0x2003;
+	    j = (t2_evt_type << 6) + (trig_mask <<4) + t1_evt_type;
+	    *lptr = j;
+            printf("\n\nWrote T1 & T2 Event Types & Trig Mask into register\n"); 
+	    break;
+	    
+	default:
+	    printf("\n\n unused key\n");
+	    break;
+	}
+
+    } /* end while */
+
+    reset_keypress();
+
+    return(0);
+}
+
+

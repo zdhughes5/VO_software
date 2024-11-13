@@ -1,0 +1,22 @@
+all: work
+	(cd libfadc; make)
+	(cd cfdtest; make)
+	(cd fadc-dacq; make)
+	(cd clock_test; make)
+	(cd fadccheck; make)
+	(cd fadc_stability; make)
+	(cd testfadc; make)
+
+
+clean:
+	(cd libfadc;make clean)
+	(cd cfdtest;make clean)
+	(cd fadc-dacq;make clean)
+	(cd clock_test;make clean)
+	(cd fadccheck;make clean)
+	(cd fadc_stability;make clean)
+	(cd testfadc;make clean)
+
+
+work:
+	setup.pl

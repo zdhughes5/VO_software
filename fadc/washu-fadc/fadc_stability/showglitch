@@ -1,0 +1,8 @@
+#!/bin/sh
+if [ -s goodpulses.dat ]; then
+    echo "Displaying good pulses (in green) and glitches (in red)"
+    echo "Press CTRL-C to exit"
+    gnuplot glitch.gpl
+else
+    echo "No pulses have been recorded"
+fi

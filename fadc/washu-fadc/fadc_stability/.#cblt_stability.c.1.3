@@ -1,0 +1,223 @@
+/***********************************************************************
+ *
+ *  cblt_stability - check cblt on full crate
+ *
+ ************************************************************************/
+
+#include <stdlib.h> 
+#include <stdio.h>
+#include <unistd.h>
+#include <fadc.h>
+#include <fadc_lowlevel.h>
+#include <unistd.h>
+#include <signal.h>
+#include <math.h>
+
+#define CBLTBUFFERSIZE 8192
+#define ERROR_TOLER 3.0   /* error bar (weight) on data points for chisqr */
+
+void getargs( int, char **);
+void usage(void);
+void init_hardware();
+void shutdown(int n);
+double Chisqr_toler = 30.0;
+int Badevents=0;
+int Test_area_header = 1;
+int Firstboard = 0;
+int Lastboard = 10;
+int User_specified_cblt =0;
+
+int
+main(int argc, char **argv) {
+
+    int nwords,prev_nwords;
+    unsigned long count=1;
+    unsigned long expected_nwords, expected_start_hdr;
+    unsigned long expected_clk_hdr, expected_hitpattern;
+    int i;
+    int badnword_flag=0;
+    unsigned long *cbltbuffer = NULL;
+    int pcount=0;
+    int lastbadchisqr;
+    unsigned long hitpattern;
+    struct sigaction sa;
+    double chisqr;
+    int is_first_pulse=1;
+    unsigned long prevevtnum=0;
+    unsigned long *lptr, *clkbd_lptr;
+    unsigned long dwidth, area_hdr, area, expected_area, areasum;
+    unsigned char *cptr;
+    int low,high,numboards;
+    int badcount=0;
+    double badpercent=0.0;
+
+    /* set up ctrl-c handler */
+    sigfillset( &sa.sa_mask );
+    sa.sa_flags =0;
+    sa.sa_handler = shutdown;
+    if (sigaction(SIGINT, &sa, NULL) < 0) {
+        perror( "sigaction SIGINT" );
+        exit(1);
+    }
+    
+    getargs(argc, argv);
+    
+    init_hardware();
+
+    /* init CBLT */
+    
+    if (User_specified_cblt) {
+	cbltbuffer = fadc_alloc_cblt_buffer(CBLTBUFFERSIZE,
+					    Firstboard,Lastboard );
+    }
+    else {
+	/* choose good values for first and last board */
+	low = 999;
+	high = -999;
+	numboards =0;
+	for (i=0; i<fadc_num_boards(); i++) {
+	    if (fadc_is_board_present(i)) {
+		if (i<low) low = i;
+		if (i>=high) high = i;
+		numboards++;
+	    }
+	}
+	printf("Using %d as FIRST board and %d as LAST board\n",low,high);
+	cbltbuffer = fadc_alloc_cblt_buffer( CBLTBUFFERSIZE, low, high );
+
+    }
+
+    fadc_evt_clr();
+
+    /* start grabbing events */ 
+
+    printf("Starting data acquisition. (waiting for triggers)\n\n");
+ 
+    while (1) { 
+
+	if (fadc_got_event() == 1) {
+
+	    nwords = fadc_cblt();
+	    
+	   
+	    if(count != 1 && count !=0){  // prev_nwords != nwords for first event!
+		if (nwords != prev_nwords) {
+		    printf("NWORDS CHANGED [evt %d]: %d (0x%08lx) "  "-> %d (0x%08lx)\n",count,
+			   prev_nwords, (unsigned long) prev_nwords, nwords, (unsigned long) nwords);
+		    badcount++;  //number of bad events
+		}
+	    }
+	    
+
+	    fadc_evt_clr();
+	    
+	    count++;
+	    pcount++;
+	    prev_nwords = nwords;
+	    badpercent = 1.0 - 100.0*( count  -  badcount) /  count;
+
+	    if (pcount >= 1000) {
+		fprintf(stderr,"Got %d events so far...  %d bad           \r",count,badcount);
+		pcount=0;
+	    }
+
+	}
+
+    }
+
+}
+
+void 
+init_hardware() {
+
+    int i;
+    char filename[128];
+    char answer[128];
+    unsigned long *lptr;
+
+    /* Init hardware */
+
+    if (fadc_init()) {
+	printf("BAD FADC INIT\n");
+	exit(1);
+    }
+
+      /* test boards */
+
+    fadc_verbose(0);
+    fadc_set_mode( FADC_ALL, WORD_MODE );
+    usleep(500);
+    printf("\n");
+    
+
+   /* load board settings */
+    fadc_verbose(0);
+    for (i=0; i<fadc_num_boards(); i++){
+      if (fadc_is_board_present(i)) {
+        sprintf( filename, "fadc-board-%d.settings", i );
+        printf("Loading settings for board in slot %d...\n", i);
+        if (fadc_load_settings( i, filename )) {
+          printf("\n** No settings file was detected for board %d\n", i);
+          printf("** You should run 'testfadc -b %d', set up the\n", i);
+          printf("** board and save its settings file.\n");
+          printf("** Do you want to continue with the defaults? (y/n) ");
+          scanf("%s", answer);
+          if( tolower(answer[0]) != 'y') {
+            exit(0);
+          }
+        }
+      }
+    }
+    fadc_verbose(1);
+
+    fadc_set_mode( FADC_ALL, FADC_MODE );
+    fadc_verbose(1);
+
+    fadc_evt_clr();
+    usleep(1000);
+
+
+}
+
+
+void
+usage(void) {
+
+    printf( "USAGE: testcblt [-f] [-c <toler>] -b <boardnum>\n\n" );
+    printf( "\t -f \t use first pulse for glitch test instead of previous\n");
+    printf( "\t -a \t disable area check\n");
+    printf( "\t -c toler \t specify chisqr tolerance (default=30.0)\n");
+    exit(0);
+    
+}
+
+
+void
+getargs( int argc, char **argv ) {
+    
+    int c,i;
+    char bdflag=0;
+ 
+    while (( c = getopt( argc, argv, "C" )) != -1 ) {
+        switch (c) {
+	case 'C':
+	    User_specified_cblt=1;
+	    break;
+        default:
+            usage();
+            exit(1);
+        }
+    }
+
+}
+
+void
+shutdown(int n) {
+
+    printf("Shutting down...\n");
+    fadc_exit();
+    exit(0);
+
+
+}
+

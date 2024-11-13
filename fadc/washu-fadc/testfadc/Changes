@@ -1,0 +1,31 @@
+Changes to the testfadc program.
+
+24 Jan 01	version 1.2	Marty O.
+	Changes for new clock board.
+
+19 Dec 00	version 1.1	Marty O.
+	testfadc.c: print message ("nuttin' honey) if we don't get data
+	    when expected. Straightened out the enable, disable, wr_mode,
+	    and evt clear sequences.
+
+ 4 Dec 00	version 1.0	Marty O.
+	libfadc.h: new macro FADC_MAXBOARDS gives max. no. of FADC in the
+	    bus.
+	libfadc.c: bug in determining the offset from WinBase when less
+	    than the max. number of boards installed.
+	testfadc.c: code cleanup
+
+ 1 Dec 00	Marty O.
+	Starting with the testfadc program by Karl Kosack dated 27 Oct 00.
+	    Using his libfadc.[ch] with the same date.
+	libfadc.c
+	    New routine fadc_bd_init() allows the system to be run with
+		just one board. The vme address space is assumed to have
+		room for 3 fadc boards, but only one board is assumed to be
+		present.
+	libfadc.h
+	    Prototype for fadc_bd_init().
+	fadc.h
+	    FADC_NCHAN macro.
+	testfadc.c
+	    Changes for dealing with just one board.

@@ -1,0 +1,5 @@
+The directories under this one (crate0, crate1...) contain settings
+files specific to each crate.  If a board is moved, make sure you
+update the correct settings file.
+
+

@@ -1,0 +1,282 @@
+/***********************************************************************
+ *
+ *  cblt_stability - check cblt on full crate
+ *
+ ************************************************************************/
+
+#include <stdlib.h> 
+#include <stdio.h>
+#include <unistd.h>
+#include <fadc.h>
+#include <fadc_lowlevel.h>
+#include <unistd.h>
+#include <signal.h>
+#include <math.h>
+
+#define CBLTBUFFERSIZE 8192
+#define ERROR_TOLER 3.0   /* error bar (weight) on data points for chisqr */
+
+void getargs( int, char **);
+void usage(void);
+void init_hardware();
+void shutdown(int n);
+void init_zero_suppress();
+double Chisqr_toler = 30.0;
+int Badevents=0;
+int Test_area_header = 1;
+int Firstboard = 0;
+int Lastboard = 10;
+int User_specified_cblt =0;
+int Randomize_zero_suppress=0;
+int Check_for_change=1;
+
+
+int
+main(int argc, char **argv) {
+
+    int nwords,prev_nwords;
+    unsigned long count=1, total=0;
+    int i;
+    unsigned long *cbltbuffer = NULL;
+    int pcount=0;
+    struct sigaction sa;
+    int low,high,numboards;
+    int badcount=0;
+    double badpercent=0.0;
+
+    /* set up ctrl-c handler */
+    sigfillset( &sa.sa_mask );
+    sa.sa_flags =0;
+    sa.sa_handler = shutdown;
+    if (sigaction(SIGINT, &sa, NULL) < 0) {
+        perror( "sigaction SIGINT" );
+        exit(1);
+    }
+
+  srand(getpid());
+  
+    getargs(argc, argv);
+    
+    init_hardware();
+  
+
+    if (Randomize_zero_suppress == 1) {  
+      /* set zero-suppress levels to simulate pulses */
+      init_zero_suppress();
+    }
+  
+
+    /* init CBLT */
+    
+    if (User_specified_cblt) {
+	cbltbuffer = fadc_alloc_cblt_buffer(CBLTBUFFERSIZE,
+					    Firstboard,Lastboard );
+    }
+    else {
+	/* choose good values for first and last board */
+	low = 999;
+	high = -999;
+	numboards =0;
+	for (i=0; i<fadc_num_boards(); i++) {
+	    if (fadc_is_board_present(i)) {
+		if (i<low) low = i;
+		if (i>=high) high = i;
+		numboards++;
+	    }
+	}
+	printf("Using %d as FIRST board and %d as LAST board\n",low,high);
+	cbltbuffer = fadc_alloc_cblt_buffer( CBLTBUFFERSIZE, low, high );
+
+    }
+
+    /* Lower Area Discriminator Threshold*/
+    /* If you want to test for 'false' errors*/
+    //fadc_set_area_discrim(FADC_ALL,FADC_ALL,5);
+     
+    fadc_evt_clr();
+
+    /* start grabbing events */ 
+
+    printf("Starting data acquisition. (waiting for triggers)\n\n");
+ 
+    while (1) { 
+
+	if (fadc_got_event() == 1) {
+
+	    nwords = fadc_cblt();
+	    /* debug line */
+	    //printf("The number of words is %d\n",nwords);
+
+          
+          
+            if (nwords<=0) {
+              printf("** libfadc reports error: nwords error code %d\n", nwords);
+              fflush(stdout);
+              badcount++;
+            }
+	    else if(count != 1 && count !=0){  // prev_nwords != nwords for first event!
+		if (nwords != prev_nwords && Check_for_change==1) {
+		    printf("NWORDS CHANGED [evt %d]: %d (0x%08lx) "
+			   "-> %d (0x%08lx)\n",count,
+			   prev_nwords, 
+			   (unsigned long) prev_nwords,
+			   nwords,
+			   (unsigned long) nwords);
+		    badcount++;  //number of bad events
+		}
+	    }
+	    
+
+	    fadc_evt_clr();
+	    
+	    count++;
+	    pcount++;
+            total++;
+	    prev_nwords = nwords;
+
+          if (pcount >= 500) {
+		fprintf(stderr,"Got %4d events so far...  %3d bad (nwords=%4d)            \r",count,badcount,nwords);
+		pcount=0;
+	    }
+
+         if (Randomize_zero_suppress==1) {
+           if (count > 5000) {
+             printf("TOTAL EVENTS: %d                               \n\n",total);
+
+             fadc_set_mode(FADC_ALL, WORD_MODE);
+             init_zero_suppress();
+             fadc_set_mode(FADC_ALL, FADC_MODE);
+             count =0;
+             fadc_evt_clr();
+           }
+         }
+          
+          
+	}
+
+    }
+
+}
+
+void 
+init_hardware() {
+
+    int i;
+    char filename[128];
+    char answer[128];
+    unsigned long *lptr;
+
+    /* Init hardware */
+
+    if (fadc_init()) {
+	printf("BAD FADC INIT\n");
+	exit(1);
+    }
+
+      /* test boards */
+
+    fadc_verbose(0);
+    fadc_set_mode( FADC_ALL, WORD_MODE );
+    usleep(500);
+    printf("\n");
+    
+
+   /* load board settings */
+    fadc_verbose(0);
+    for (i=0; i<fadc_num_boards(); i++){
+      if (fadc_is_board_present(i)) {
+        sprintf( filename, "fadc-board-%d.settings", i );
+        printf("Loading settings for board in slot %d...\n", i);
+        if (fadc_load_settings( i, filename )) {
+          printf("\n** No settings file was detected for board %d\n", i);
+          printf("** You should run 'testfadc -b %d', set up the\n", i);
+          printf("** board and save its settings file.\n");
+          printf("** Do you want to continue with the defaults? (y/n) ");
+          scanf("%s", answer);
+          if( tolower(answer[0]) != 'y') {
+            exit(0);
+          }
+        }
+      }
+    }
+    fadc_verbose(1);
+
+    fadc_set_mode( FADC_ALL, FADC_MODE );
+    fadc_verbose(1);
+
+    fadc_evt_clr();
+    usleep(1000);
+
+
+}
+
+
+void
+usage(void) {
+
+    printf( "USAGE: testcblt [-f] [-c <toler>] -b <boardnum>\n\n" );
+    printf( "\t -d disable check for change in nwords\n");
+    printf( "\t -z randomize Zero suppression levels\n");
+  
+  exit(0);
+    
+}
+
+
+void
+getargs( int argc, char **argv ) {
+    
+    int c,i;
+    char bdflag=0;
+ 
+    while (( c = getopt( argc, argv, "Czd" )) != -1 ) {
+        switch (c) {
+	case 'C':
+	    User_specified_cblt=1;
+	    break;
+        case 'z':
+          Randomize_zero_suppress=1;
+          break;
+          case 'd':
+          Check_for_change=0;
+          break;
+        default:
+            usage();
+            exit(1);
+        }
+    }
+
+}
+
+void
+shutdown(int n) {
+
+    printf("Shutting down...\n");
+    fadc_exit();
+    exit(0);
+
+
+}
+
+
+void
+init_zero_suppress() {
+  
+  int i;
+  int r;
+  int b;
+
+  
+  fadc_verbose(0);
+  for (b=0; b<fadc_num_boards(); b++) {
+    printf("SLOT %2d ZERO SUP: ",b);
+    for (i=0; i<10; i++) {
+      r = rand() < RAND_MAX/2? 0:255;
+      printf("%2d=%2d ",i,r);
+      fadc_set_area_discrim( b, i, r);
+    }
+    printf("\n");
+  }
+  fadc_verbose(1);
+  
+}

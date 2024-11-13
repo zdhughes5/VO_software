@@ -1,0 +1,16 @@
+
+XLIBS = -L/usr/X11R6/lib -L/usr/local/lib -lXt -lXaw -lXext -lXmu -lsx 
+LINUXLIBS = -L/usr/lib/vmic -lvme -lm -lpthread -lgsl -lgslcblas 
+HEADERS = client.h consts.h handler.h version.h
+CFLAGS =  -ggdb -I../libfadc -L../libfadc
+
+all: linux
+
+linux: testfadc.c $(OBJS)
+	$(CC)  $(CFLAGS) -o testfadc testfadc.c $(XLIBS)  -lfadc $(LINUXLIBS)
+
+clean:
+	-rm -f libfadc *.o client testfadc testfadc_linux testfadc_qnx core
+
+tar:	clean
+	(cd ../;  tar --exclude CVS -cf testfadc.tar testfadc)
