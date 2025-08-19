@@ -4,7 +4,7 @@
     "guiHeartbeatConnIP": "127.0.0.1:31256",
     "guiStatusConnIP": "127.0.0.1:31257",
     "harvesterControlConnIP": "192.168.1.128:5000",
-    "dataSavePath": "/home/labuser/optical_data/",
+    "dataSavePath": "/home/zdhughes/optical_data/",
     "sendInterval": 150,
     "commands": {
         "nothing": 0,

@@ -4,7 +4,7 @@
             "telescope": 1,
             "missing": false,
             "harvesters": [
-                {"arrayPosition": 0, "localPosition": 0, "missing": false, "ip": "10.0.200.248:31261", "channel": [0, 70], "pixelIndex": [0, 70]},
+                {"arrayPosition": 0, "localPosition": 0, "missing": false, "ip": "127.0.0.1:30001", "channel": [0, 70], "pixelIndex": [0, 70]},
                 {"arrayPosition": 1, "localPosition": 1, "missing": true, "ip": "127.0.0.1:30002", "channel": [70, 140], "pixelIndex": [70, 130]},
                 {"arrayPosition": 2, "localPosition": 2, "missing": true, "ip": "127.0.0.1:30003", "channel": [140, 210], "pixelIndex": [130, 200]},
                 {"arrayPosition": 3, "localPosition": 3, "missing": true, "ip": "127.0.0.1:30004", "channel": [210, 280], "pixelIndex": [200, 250]},
