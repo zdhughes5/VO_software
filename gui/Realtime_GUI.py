@@ -187,6 +187,7 @@ class database_worker(QtCore.QObject):
 
         for telescope in ['t1', 't2', 't3', 't4']:
             current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.rad, az=vpm[telescope]['azimuth_raw']*u.rad, location=self.basecamp, obstime=current_time, frame='altaz')
+            print(telescope, ':',current_pointing)
             separation = current_pointing.separation(stars_altaz)
             stars_in_fov = stars_altaz[separation < 2*u.deg]
             dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
@@ -1385,7 +1386,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         border_pen = pg.mkPen(color='k', width=1)  # Black border with width 1
         for i, star_positions in enumerate(array_star_positions):
             if len(star_positions) > 0:
-                xs, ys = list(zip(*star_positions))
+                ys, xs = list(zip(*star_positions)) # ZACH, I SWITCH xs with ys THIS ON 6/5/2025
                 #print("telescope", i)
                 #print("xys", xs, ys)
                 scatter_plot = pg.ScatterPlotItem(
