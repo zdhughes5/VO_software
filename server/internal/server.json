@@ -5,7 +5,7 @@
     "guiStatusConnIP": "127.0.0.1:31257",
     "harvesterControlConnIP": "192.168.1.128:5000",
     "dataSavePath": "/home/labuser/optical_data/",
-    "sendInterval": 150,
+    "sendInterval": 30,
     "commands": {
         "nothing": 0,
         "startRunCmd": 1,

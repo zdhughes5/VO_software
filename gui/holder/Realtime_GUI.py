@@ -299,7 +299,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.star_field_labels = [None, None, None, None]
 
         self.weights = np.zeros(499)
-        self.hexSize = 12.4
+        self.hexSize = 13
         self.cameraView.ci.setBorder((50, 50, 100))
         self.w1 = self.cameraView.addViewBox(enableMouse=False)
         self.w2 = self.cameraView.addViewBox(enableMouse=False)
@@ -382,10 +382,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.w2.disableAutoRange()
         self.w3.disableAutoRange()
         self.w4.disableAutoRange()
-        self.w5.disableAutoRange()
-        self.w5.enableAutoRange(x=True)
-        #self.w5.setRange(xRange=[0, 1000], padding=0)
-        self.w5.setMouseEnabled(x=False, y=True)
+        #self.w5.disableAutoRange(y=self.w5.YAxis)
+        #self.w5.setMouseEnabled(x=False, y=True)
         self.firstFlip = False
 
 
@@ -665,8 +663,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def set_fadc_gate_array_window(self):
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
-        #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
+        self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
 
     def set_current_datetime(self):
         self.VO_db_params_run_status_line.setText('ended')

@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     printf( "CBLT: Firstboard=%d, Lastboard=%d\n", Firstboard, Lastboard);
 
-for (i = 0; i < fadc_num_boards(); i++) {
+for (i = 0; i < 1; i++) {
     if (fadc_is_board_present(i)) {
         fadc_set_mode(i, WORD_MODE);
         set_pedvar_reset();
