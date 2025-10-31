@@ -681,24 +681,29 @@ def extract_data_from_chunk(chunk):
 
 def save_to_fits(data, filename):
     # Convert the data to a FITS table
-    col1 = fits.Column(name='number', format='K', array=[d['number'] for d in data])
-    col2 = fits.Column(name='timestamp', format='D', array=[d['timestamp'] for d in data])
-    col3 = fits.Column(name='extra_reg1', format='I', array=[d['extra_reg1'] for d in data])
-    col4 = fits.Column(name='extra_reg2', format='I', array=[d['extra_reg2'] for d in data])
-    col5 = fits.Column(name='extra_reg3', format='I', array=[d['extra_reg3'] for d in data])
-    col6 = fits.Column(name='window_size', format='I', array=[d['window_size'] for d in data])
-    col7 = fits.Column(name='ch_mask_bits', format='K', array=[d['ch_mask_bits'] for d in data])
-    col8 = fits.Column(name='variances', format='70D', array=[d['variances'] for d in data])
+    # Note: ch_mask_bits is 70-bit, so we split it into two 64-bit parts
+    col1 = fits.Column(name='number', format='K', array=np.array([d['number'] for d in data], dtype=np.uint64))
+    col2 = fits.Column(name='timestamp', format='D', array=np.array([d['timestamp'] for d in data], dtype=np.float64))
+    col3 = fits.Column(name='extra_reg1', format='I', array=np.array([d['extra_reg1'] for d in data], dtype=np.uint32))
+    col4 = fits.Column(name='extra_reg2', format='I', array=np.array([d['extra_reg2'] for d in data], dtype=np.uint32))
+    col5 = fits.Column(name='extra_reg3', format='I', array=np.array([d['extra_reg3'] for d in data], dtype=np.uint32))
+    col6 = fits.Column(name='window_size', format='I', array=np.array([d['window_size'] for d in data], dtype=np.uint32))
+    # Split 70-bit channel mask into low 64 bits and high 6 bits
+    col7 = fits.Column(name='ch_mask_low', format='K', array=np.array([d['ch_mask_bits'] & 0xFFFFFFFFFFFFFFFF for d in data], dtype=np.uint64))
+    col8 = fits.Column(name='ch_mask_high', format='B', array=np.array([d['ch_mask_bits'] >> 64 for d in data], dtype=np.uint8))
+    col9 = fits.Column(name='variances', format='70D', array=np.array([d['variances'] for d in data], dtype=np.float64))
 
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
+    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9])
     hdu = fits.BinTableHDU.from_columns(cols)
 
     # Write the FITS file
     hdu.writeto(filename, overwrite=True)
 
-def process_and_save_to_fits(binary_filename, fits_filename):
+def process_and_save_to_fits(binary_filename, fits_filename, max_events=None):
     data = []
-    for chunk in read_binary_file_in_chunks(binary_filename):
+    for i, chunk in enumerate(read_binary_file_in_chunks(binary_filename)):
+        if max_events is not None and i >= max_events:
+            break
         parsed_data = extract_data_from_chunk(chunk)
         data.append(parsed_data)
     
@@ -706,44 +711,130 @@ def process_and_save_to_fits(binary_filename, fits_filename):
 
 def save_to_fits_incrementally(data, filename):
     # Convert the data to a FITS table
-    col1 = fits.Column(name='number', format='K', array=[d['number'] for d in data])
-    col2 = fits.Column(name='timestamp', format='D', array=[d['timestamp'] for d in data])
-    col3 = fits.Column(name='extra_reg1', format='I', array=[d['extra_reg1'] for d in data])
-    col4 = fits.Column(name='extra_reg2', format='I', array=[d['extra_reg2'] for d in data])
-    col5 = fits.Column(name='extra_reg3', format='I', array=[d['extra_reg3'] for d in data])
-    col6 = fits.Column(name='window_size', format='I', array=[d['window_size'] for d in data])
-    col7 = fits.Column(name='ch_mask_bits', format='K', array=[d['ch_mask_bits'] for d in data])
-    col8 = fits.Column(name='variances', format='70D', array=[d['variances'] for d in data])
+    # Note: ch_mask_bits is 70-bit, so we split it into two 64-bit parts
+    col1 = fits.Column(name='number', format='K', array=np.array([d['number'] for d in data], dtype=np.uint64))
+    col2 = fits.Column(name='timestamp', format='D', array=np.array([d['timestamp'] for d in data], dtype=np.float64))
+    col3 = fits.Column(name='extra_reg1', format='I', array=np.array([d['extra_reg1'] for d in data], dtype=np.uint32))
+    col4 = fits.Column(name='extra_reg2', format='I', array=np.array([d['extra_reg2'] for d in data], dtype=np.uint32))
+    col5 = fits.Column(name='extra_reg3', format='I', array=np.array([d['extra_reg3'] for d in data], dtype=np.uint32))
+    col6 = fits.Column(name='window_size', format='I', array=np.array([d['window_size'] for d in data], dtype=np.uint32))
+    # Split 70-bit channel mask into low 64 bits and high 6 bits
+    col7 = fits.Column(name='ch_mask_low', format='K', array=np.array([d['ch_mask_bits'] & 0xFFFFFFFFFFFFFFFF for d in data], dtype=np.uint64))
+    col8 = fits.Column(name='ch_mask_high', format='B', array=np.array([d['ch_mask_bits'] >> 64 for d in data], dtype=np.uint8))
+    col9 = fits.Column(name='variances', format='70D', array=np.array([d['variances'] for d in data], dtype=np.float64))
 
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
+    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9])
     hdu = fits.BinTableHDU.from_columns(cols)
 
     # Write the FITS file
     hdu.writeto(filename, overwrite=True)
 
-def process_and_save_to_fits_incrementally(binary_filename, fits_filename):
+def process_and_save_to_fits_incrementally(binary_filename, fits_filename, max_events=None, batch_size=1000):
+    """
+    Process binary file incrementally to avoid loading entire file into memory.
+    
+    Parameters:
+    -----------
+    binary_filename : str
+        Path to the binary file to process
+    fits_filename : str
+        Path to the output FITS file
+    max_events : int or None
+        Maximum number of events to process (None for all)
+    batch_size : int
+        Number of events to accumulate before writing to disk (default 1000)
+    """
     data = []
-    first_chunk = True
-    for chunk in read_binary_file_in_chunks(binary_filename):
+    event_count = 0
+    
+    for i, chunk in enumerate(read_binary_file_in_chunks(binary_filename)):
+        if max_events is not None and i >= max_events:
+            break
+            
         parsed_data = extract_data_from_chunk(chunk)
         data.append(parsed_data)
+        event_count += 1
         
-        if first_chunk:
-            save_to_fits_incrementally(data, fits_filename)
-            first_chunk = False
-        else:
-            with fits.open(fits_filename, mode='append') as hdul:
-                col1 = fits.Column(name='number', format='K', array=[d['number'] for d in data])
-                col2 = fits.Column(name='timestamp', format='D', array=[d['timestamp'] for d in data])
-                col3 = fits.Column(name='extra_reg1', format='I', array=[d['extra_reg1'] for d in data])
-                col4 = fits.Column(name='extra_reg2', format='I', array=[d['extra_reg2'] for d in data])
-                col5 = fits.Column(name='extra_reg3', format='I', array=[d['extra_reg3'] for d in data])
-                col6 = fits.Column(name='window_size', format='I', array=[d['window_size'] for d in data])
-                col7 = fits.Column(name='ch_mask_bits', format='K', array=[d['ch_mask_bits'] for d in data])
-                col8 = fits.Column(name='variances', format='70D', array=[d['variances'] for d in data])
+        # Write batch when we reach batch_size or when we hit max_events
+        if len(data) >= batch_size or (max_events is not None and event_count >= max_events):
+            if event_count <= batch_size:  # First batch - create new file
+                save_to_fits(data, fits_filename)
+                print(f"Created FITS file with first {len(data)} events")
+            else:  # Subsequent batches - append to existing table
+                # Read existing data
+                with fits.open(fits_filename) as hdul:
+                    existing_data = hdul[1].data
+                    
+                    # Convert existing data to list of dicts
+                    all_data = []
+                    for row in existing_data:
+                        ch_mask = reconstruct_channel_mask(row['ch_mask_low'], row['ch_mask_high'])
+                        all_data.append({
+                            'number': row['number'],
+                            'timestamp': row['timestamp'],
+                            'extra_reg1': row['extra_reg1'],
+                            'extra_reg2': row['extra_reg2'],
+                            'extra_reg3': row['extra_reg3'],
+                            'window_size': row['window_size'],
+                            'ch_mask_bits': ch_mask,
+                            'variances': list(row['variances'])
+                        })
+                    
+                    # Add new data
+                    all_data.extend(data)
+                
+                # Write combined data back
+                save_to_fits(all_data, fits_filename)
+                print(f"Appended {len(data)} events (total: {len(all_data)} events)")
+            
+            data.clear()
+    
+    # Write any remaining data
+    if data:
+        if event_count <= len(data):  # Only batch - create new file
+            save_to_fits(data, fits_filename)
+            print(f"Created FITS file with {len(data)} events")
+        else:  # Final partial batch - append
+            with fits.open(fits_filename) as hdul:
+                existing_data = hdul[1].data
+                
+                all_data = []
+                for row in existing_data:
+                    ch_mask = reconstruct_channel_mask(row['ch_mask_low'], row['ch_mask_high'])
+                    all_data.append({
+                        'number': row['number'],
+                        'timestamp': row['timestamp'],
+                        'extra_reg1': row['extra_reg1'],
+                        'extra_reg2': row['extra_reg2'],
+                        'extra_reg3': row['extra_reg3'],
+                        'window_size': row['window_size'],
+                        'ch_mask_bits': ch_mask,
+                        'variances': list(row['variances'])
+                    })
+                
+                all_data.extend(data)
+            
+            save_to_fits(all_data, fits_filename)
+            print(f"Appended final {len(data)} events (total: {len(all_data)} events)")
 
-                cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
-                hdu = fits.BinTableHDU.from_columns(cols)
-                hdul.append(hdu)
+def reconstruct_channel_mask(ch_mask_low, ch_mask_high):
+    """
+    Reconstruct the original 70-bit channel mask from the split components.
+    
+    Parameters:
+    -----------
+    ch_mask_low : int or array
+        Lower 64 bits of the channel mask
+    ch_mask_high : int or array  
+        Upper 6 bits of the channel mask
         
-        data.clear()
+    Returns:
+    --------
+    int or array : The reconstructed 70-bit channel mask
+    """
+    # Convert to Python int to allow arbitrary precision arithmetic
+    if isinstance(ch_mask_low, np.ndarray):
+        return np.array([(int(high) << 64) | int(low) for low, high in zip(ch_mask_low, ch_mask_high)])
+    else:
+        return (int(ch_mask_high) << 64) | int(ch_mask_low)
+
