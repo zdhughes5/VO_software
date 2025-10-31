@@ -200,7 +200,6 @@ func main() {
 			}
 
 		case config.Commands.StopRunCmd:
-			log.Println("StopRunCmd: Hola!")
 			//log.Printf("StopRunCmd: listeningTimer address: %p", listeningTimer)
 			if !runReady {
 				log.Println("StopRunCmd: Stopping data logging...")
@@ -214,6 +213,7 @@ func main() {
 				}
 			} else {
 				log.Println("StopRunCmd: No run to stop.")
+				_ = netutils.SendStatusCode(udpStatusConn, config.Status.Not_running)
 			}
 
 			/*log.Println("StopRunCmd: Hola!")

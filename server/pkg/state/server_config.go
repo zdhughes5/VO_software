@@ -11,6 +11,7 @@ type Status struct {
 	Aborted        int `json:"aborted"`
 	Ended          int `json:"ended"`
 	Ended_manually int `json:"ended_manually"`
+	Not_running    int `json:"not_running"`
 }
 
 type Commands struct {

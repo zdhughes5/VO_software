@@ -21,6 +21,7 @@
         "started": 1000,
         "aborted": 1001,
         "ended": 1002,
-        "ended_manually": 1003
+        "ended_manually": 1003,
+        "not_running": 1004
     }
 }
