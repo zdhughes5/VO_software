@@ -666,7 +666,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
     def set_fadc_gate_array_window(self):
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
         #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
+        #self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
+        self.execute_binary_over_ssh('10.0.0.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
 
     def set_current_datetime(self):
         self.VO_db_params_run_status_line.setText('ended')
@@ -1389,7 +1390,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         border_pen = pg.mkPen(color='k', width=1)  # Black border with width 1
         for i, star_positions in enumerate(array_star_positions):
             if len(star_positions) > 0:
-                xs, ys = list(zip(*star_positions))
+                ys, xs = list(zip(*star_positions))
                 #print("telescope", i)
                 #print("xys", xs, ys)
                 scatter_plot = pg.ScatterPlotItem(
