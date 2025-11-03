@@ -50,6 +50,18 @@ QPushButton#StartButton:disabled {
     color: rgb(140, 170, 140);
 }
 
+/* Specific style for AutomateButton */
+QPushButton#AutomateButton {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(0, 170, 0);
+}
+
+QPushButton#AutomateButton:disabled {
+    font-weight: bold;
+    font-size: 35px;
+    color: rgb(140, 170, 140);
+}
 
 
 /* Specific style for StopButton */

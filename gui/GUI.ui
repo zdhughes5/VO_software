@@ -773,17 +773,41 @@
             </widget>
            </item>
            <item>
+            <widget class="QPushButton" name="StartButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>50</height>
+              </size>
+             </property>
+             <property name="font">
+              <font>
+               <family>Sans Serif</family>
+               <pointsize>25</pointsize>
+               <weight>75</weight>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Single</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <layout class="QHBoxLayout" name="start_stop_h_layout">
              <item>
-              <widget class="QPushButton" name="StartButton">
+              <widget class="QPushButton" name="AutomateButton">
                <property name="enabled">
                 <bool>false</bool>
-               </property>
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
                </property>
                <property name="minimumSize">
                 <size>
@@ -793,7 +817,6 @@
                </property>
                <property name="font">
                 <font>
-                 <family>Sans Serif</family>
                  <pointsize>25</pointsize>
                  <weight>75</weight>
                  <bold>true</bold>
@@ -978,28 +1001,28 @@
              <item row="1" column="0">
               <widget class="QPushButton" name="harvester_command_c003_button">
                <property name="text">
-                <string>0xc003</string>
+                <string>Test Transmission </string>
                </property>
               </widget>
              </item>
              <item row="0" column="1">
               <widget class="QPushButton" name="harvester_command_c002_button">
                <property name="text">
-                <string>0xc002</string>
+                <string>Disarm Harvester</string>
                </property>
               </widget>
              </item>
              <item row="1" column="1">
               <widget class="QPushButton" name="harvester_command_c004_button">
                <property name="text">
-                <string>0xc004</string>
+                <string>UNIX Time Sync</string>
                </property>
               </widget>
              </item>
              <item row="0" column="0">
               <widget class="QPushButton" name="harvester_command_c001_button">
                <property name="text">
-                <string>0xc001</string>
+                <string>Arm Harvester</string>
                </property>
               </widget>
              </item>
@@ -1419,8 +1442,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>1890</width>
-             <height>1006</height>
+             <width>1737</width>
+             <height>1015</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_24">
@@ -5003,7 +5026,7 @@
      <x>0</x>
      <y>0</y>
      <width>1735</width>
-     <height>27</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

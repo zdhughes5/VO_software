@@ -102,11 +102,13 @@ class database_worker(QtCore.QObject):
     query_run_number_signal = QtCore.pyqtSignal(int)
     query_timeout_signal = QtCore.pyqtSignal()
     query_ok_signal = QtCore.pyqtSignal(bool)
+    observing_info_signal = QtCore.pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
         self.vpm_timer = QtCore.QTimer()
         self.vpm_timer.timeout.connect(self.get_stars_in_fov)
+        self.vpm_timer.timeout.connect(self.handle_observing_info)
         self.running = False
         self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
@@ -117,7 +119,7 @@ class database_worker(QtCore.QObject):
         star_DEC_deg = np.array([float(x.split()[2]) for x in lines])
         self.stars = SkyCoord(ra=star_RA_deg*u.deg, dec=star_DEC_deg*u.deg)
         self.queue_check_counter = 0
-        self.queue_check_interval = 2.5
+        self.queue_check_interval = 0.5
         self.maximum_queue_checks = 5
 
         # Database configuration
@@ -130,6 +132,7 @@ class database_worker(QtCore.QObject):
         }
 
         self.queue = Queue(maxsize=1)
+        self.observing_info_queue = Queue(maxsize=1)
         self.command_queue = Queue()
         self.process = None
 
@@ -139,7 +142,7 @@ class database_worker(QtCore.QObject):
     def start_querying(self):
         if self.process is not None:
             self.stop_querying()
-        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config, self.command_queue))
+        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config, self.command_queue, self.observing_info_queue))
         self.process.start()
         self.vpm_timer.start(int(self.queue_check_interval*1000))  # Check the queue every 2.5 seconds
 
@@ -164,6 +167,7 @@ class database_worker(QtCore.QObject):
 
     def get_stars_in_fov(self):
         if not self.queue.empty():
+            #print('Fetching VPM data from queue...')
             vpm = self.queue.get()
             self.VPM_fetched_signal.emit(vpm)
             self.calculate_star_offsets(vpm)
@@ -178,6 +182,19 @@ class database_worker(QtCore.QObject):
                     logger.log(logging.WARNING, "Haven't got pointing from VERITAS MySQL DB worker in %d seconds" % (self.queue_check_counter*self.queue_check_interval), extra=extra)
 
 
+    def handle_observing_info(self):
+        if not self.observing_info_queue.empty():
+            obs_info = self.observing_info_queue.get()
+            if obs_info:
+                #print(f"Observing info: {obs_info}")
+                self.observing_info_signal.emit(obs_info)
+                #self.query_run_number_signal.emit(obs_info['source_id'])
+            else:
+                print("No observing info available.")
+        else:
+            print("No observing info available2.")
+            #self.query_timeout_signal.emit()
+
     def calculate_star_offsets(self, vpm):
         current_time = Time.now()
         stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
@@ -187,6 +204,7 @@ class database_worker(QtCore.QObject):
 
         for telescope in ['t1', 't2', 't3', 't4']:
             current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.rad, az=vpm[telescope]['azimuth_raw']*u.rad, location=self.basecamp, obstime=current_time, frame='altaz')
+            #print(telescope, ':',current_pointing)
             separation = current_pointing.separation(stars_altaz)
             stars_in_fov = stars_altaz[separation < 2*u.deg]
             dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
@@ -203,25 +221,6 @@ class database_worker(QtCore.QObject):
 
     def stop(self):
         self.stop_querying()
-
-    def query_last_run_number(self):
-        start_time = time.time()
-        query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
-        self.fetch_data(query)
-        elapsed_time = time.time() - start_time
-        print(f"query_last_run_number took {elapsed_time:.4f} seconds")
-
-    def fetch_data(self, query):
-        start_time = time.time()
-        try:
-            self.crs.execute(query)
-            res = self.crs.fetchone()
-            if res:
-                return res
-        except Exception as e:
-            print(f"Error querying database: {e}")
-        elapsed_time = time.time() - start_time
-        print(f"fetch_data took {elapsed_time:.4f} seconds")
 
 class VeritasSQLPingWorker(QtCore.QThread):
     result_signal = QtCore.pyqtSignal(bool)
@@ -532,6 +531,74 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.data_display_sample_button.clicked.connect(self.update_sample_average)
 
+        self.last_obs_info = None
+        self.first_check = True
+
+        self.AutomateButton.clicked.connect(self.begin_running)
+        self.automated = None
+        self.StopButton.clicked.connect(self.stop_running)
+
+        self.checkTimer = QtCore.QTimer(self)
+        self.checkTimer.timeout.connect(self.get_last_obs_info)
+        self.checkTimer.setInterval(10)
+        #self.checkTimer.start()
+        self.run_in_progess = False
+
+
+    def get_last_obs_info(self):
+        print("Last observing info:", self.last_obs_info)
+
+    # Connected to the observing_info_signal from the db_worker
+    def detect_observing_info_changes(self, obs_info):
+        """
+        Detect changes in the observing info and update the UI accordingly.
+        """
+        #print("Last run status:", self.last_obs_info)
+        #print("Current run status:", obs_info['run_status'])
+
+        if self.last_obs_info is None:
+            self.obs_params_veritas_runid_spin.setValue(int(obs_info['run_id']))
+            #self.query_veritas_sql() #RunID is included in obs_info; update in future to use instead of querying and waiting for it.
+            #time.sleep(0.5)  # Small delay to ensure DB is updated
+            self.obs_params_duration_spin.setValue(50400)  # Set to 8 hours in seconds
+            self.obs_params_sourceid_line.setText(str(obs_info['source_id']))
+            self.obs_set_changes()
+        elif self.last_obs_info is not None and obs_info['run_status'] != self.last_obs_info['run_status'] and obs_info['run_type'] == 'observing':
+            if obs_info['run_status'] == 'started':
+                self.obs_params_veritas_runid_spin.setValue(int(obs_info['run_id']))
+                #self.query_veritas_sql() #RunID is included in obs_info; update in future to use instead of querying and waiting for it.
+                #time.sleep(0.5)  # Small delay to ensure DB is updated
+                self.obs_params_duration_spin.setValue(50400)  # Set to 8 hours in seconds
+                self.obs_params_sourceid_line.setText(str(obs_info['source_id']))
+                self.obs_set_changes()
+                self.request_listen()
+            elif obs_info['run_status'] == 'ended' or obs_info['run_status'] == 'manually_ended':
+                self.send_stop_message()
+
+        self.last_obs_info = obs_info
+
+
+
+
+    def begin_running(self):
+
+        self.automated = True
+        self.AutomateButton.setEnabled(False)
+        self.AutomateButton.setText("Running...")
+        self.db_worker.observing_info_signal.connect(self.detect_observing_info_changes)
+        self.set_gui_components_enabled(False)
+        self.StartButton.setEnabled(False)
+
+        
+
+    def stop_running(self):
+        self.automated = False
+        self.AutomateButton.setEnabled(True)
+        self.StartButton.setEnabled(True)
+        self.AutomateButton.setText("Start")
+        self.db_worker.observing_info_signal.disconnect(self.detect_observing_info_changes)
+
+
     def update_sample_average(self):
         self.sample_average = self.data_display_sample_spin.value()
     
@@ -590,6 +657,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def get_VO_db_params_filled_short(self):
         return {key: self.VO_db_params_filled[key] for key in ['run_id', 'veritas_run_id', 'run_type', 'run_window', 'duration', 'telescope_mask', 'harvester_mask', 'source_id']}
+
+    def get_VO_db_params_filled_mini(self):
+        return {key: self.VO_db_params_filled[key] for key in ['run_id', 'run_type', 'run_window', 'duration', 'telescope_mask', 'harvester_mask']}
+
 
     def request_listen(self):
         # Create data_map with parameters from VO_db_params and self.config_data
@@ -764,6 +835,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         if not self.firstFlip and self.check_VO_db_params_filled(self.get_VO_db_params_filled_short()):
             self.firstFlip = True
             self.StartButton.setEnabled(True)
+        if not self.firstFlip and self.check_VO_db_params_filled(self.get_VO_db_params_filled_mini()):
+            self.firstFlip = True
+            self.AutomateButton.setEnabled(True)
 
 
 
@@ -921,23 +995,32 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.VO_db_params_filled['db_end_time'] = False
             self.VO_db_params_filled['data_end_time'] = False
             self.set_gui_components_enabled(False)
+            self.run_in_progess = True
         elif status_code == self.config_data["status"]["aborted"]:
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.set_gui_components_enabled(True)
+            self.run_in_progess = False
         elif status_code == self.config_data["status"]["ended"]:
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.set_gui_components_enabled(True)
+            if not self.automated: # Stops the GUI from flickering on and off on automated runs
+                self.set_gui_components_enabled(True)
             self.write_VO_db_params_to_db()
+            self.run_in_progess = False
         elif status_code == self.config_data["status"]["ended_manually"]:
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.set_gui_components_enabled(True)
+            if not self.automated:
+                self.set_gui_components_enabled(True)
             self.write_VO_db_params_to_db()
+            self.run_in_progess = False
+        elif status_code == self.config_data["status"]["not_running"]:
+            self.set_gui_components_enabled(True)
+            self.run_in_progess = False
         else:
             logger.log(logging.WARNING, f"Received unknown status: {status_code}", extra=extra)
 
@@ -1041,6 +1124,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.db_worker.VPM_fetched_signal.connect(self.handle_VPM_data)
             self.db_worker.star_field_signal.connect(self.draw_star_field)
             self.db_worker.query_ok_signal.connect(self.veritas_sql_status)
+            #self.db_worker.observing_info_signal.connect(self.detect_observing_info_changes)
 
             # Start the thread
             self.db_thread.start()
@@ -1158,7 +1242,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def load_state_file(self):
-        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load State File", "", "JSON Files (*.json);;All Files (*)")
+        default_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../server/internal"))
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Load State File",
+            default_dir,
+            "JSON Files (*.json);;All Files (*)"
+        )
         if file_name:
             with open(file_name, 'r') as file:
                 self.state_data = json.load(file)
@@ -1395,7 +1485,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         border_pen = pg.mkPen(color='k', width=1)  # Black border with width 1
         for i, star_positions in enumerate(array_star_positions):
             if len(star_positions) > 0:
-                ys, xs = list(zip(*star_positions))
+                ys, xs = list(zip(*star_positions)) # ZACH, I SWITCH xs with ys THIS ON 6/5/2025
                 #print("telescope", i)
                 #print("xys", xs, ys)
                 scatter_plot = pg.ScatterPlotItem(
