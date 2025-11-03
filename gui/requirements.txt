@@ -1,9 +1,0 @@
-astroplan==0.10.1
-astropy==4.2.1
-msgpack_numpy==0.4.8
-msgpack_python==0.5.6
-numpy==1.20.1
-pymysql==1.1.2
-PyQt6==6.10.0
-pyqtgraph==0.13.7
-pyzmq==20.0.0

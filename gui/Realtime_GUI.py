@@ -52,7 +52,7 @@ from ast import literal_eval as le
 fs = '[%(asctime)s %(levelname)s] %(message)s'
 formatter = logging.Formatter(fs)
 #ogging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
-logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
+logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("../logs/gui.log", mode="a")])
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
