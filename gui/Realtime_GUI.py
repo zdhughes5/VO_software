@@ -618,11 +618,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         try:
             # Define the host and port from the configuration
-            #host = QHostAddress(self.config_data['harvesterControlConnIP'].split(':')[0])
-            #port = int(self.config_data['harvesterControlConnIP'].split(':')[1])
+            host = QHostAddress(self.config_data['harvesterControlConnIP'].split(':')[0])
+            port = int(self.config_data['harvesterControlConnIP'].split(':')[1])
             #host = QHostAddress.SpecialAddress.Broadcast
-            host = QHostAddress('255.255.255.255')
-            port = 5000
+            #host = QHostAddress('255.255.255.255')
+            #port = 5000
             socket = QUdpSocket()
             logger.log(logging.INFO, f'HOST IS BROADCAST: {QHostAddress.isBroadcast(host)}', extra=extra)
 
