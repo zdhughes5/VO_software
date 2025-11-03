@@ -561,9 +561,25 @@ def convert_to_decimal(word):
     # Combine the integer and fractional parts
     return integer_part + fractional_decimal
 
-def extract_data(event):
+def read_events_from_binary_file(filename, chunk_size=308):
+    try:
+        with open(filename, 'rb') as file:
+            while True:
+                chunk = file.read(chunk_size)
+                if len(chunk) < chunk_size:
+                    break  # End of file or incomplete chunk
+                yield chunk
+    except IOError as e:
+        print(f"Error reading file {filename}: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        sys.exit(1)
+    
+
+def parse_data_from_event(chunk):
     # Offsets for the required data
-    number_offset = 0
+    event_number_offset = 0
     timestamp_seconds_offset = 4
     timestamp_nanoseconds_offset = 8
     extra_reg_offset = 12
@@ -571,71 +587,8 @@ def extract_data(event):
     ch_mask_bits_offset = 20
     variance_offset = 0x1c
 
-    # Extract the 32-bit number (4 bytes) at offset 0
-    number = struct.unpack_from('>I', event, number_offset)[0]
-
-    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
-    timestamp_seconds = struct.unpack_from('>I', event, timestamp_seconds_offset)[0]
-
-    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
-    timestamp_nanoseconds = struct.unpack_from('>I', event, timestamp_nanoseconds_offset)[0]
-
-    # Combine the seconds and nanoseconds to form a complete timestamp
-    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
-
-    # Extract the extra registers (6 bytes) at offset 12
-    extra_reg1 = struct.unpack_from('>H', event, extra_reg_offset)[0]
-    extra_reg2 = struct.unpack_from('>H', event, extra_reg_offset + 2)[0]
-    extra_reg3 = struct.unpack_from('>H', event, extra_reg_offset + 4)[0]
-
-    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
-    window_size_and_mask = struct.unpack_from('>H', event, window_size_offset)[0]
-    window_size = window_size_and_mask >> 13
-    ch_mask_bits_high = window_size_and_mask & 0x3F
-
-    # Extract the 64-bit channel mask at offset 20
-    ch_mask_bits_low = struct.unpack_from('>Q', event, ch_mask_bits_offset)[0]
-
-    # Combine the 6 bits with the 64-bit number to form the full channel mask
-    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
-
-    # Extract the variances (280 bytes) starting at offset 28
-    variances = []
-    for i in range(70):
-        variance_word = struct.unpack_from('>I', event, variance_offset + i * 4)[0]
-        variances.append(convert_to_decimal(variance_word))
-
-    return {
-        'number': number,
-        'timestamp': timestamp,
-        'extra_reg1': extra_reg1,
-        'extra_reg2': extra_reg2,
-        'extra_reg3': extra_reg3,
-        'window_size': window_size,
-        'ch_mask_bits': ch_mask_bits,
-        'variances': variances
-    }
-
-def read_binary_file_in_chunks(filename, chunk_size=308):
-    with open(filename, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            if len(chunk) < chunk_size:
-                break  # End of file or incomplete chunk
-            yield chunk
-
-def extract_data_from_chunk(chunk):
-    # Offsets for the required data
-    number_offset = 0
-    timestamp_seconds_offset = 4
-    timestamp_nanoseconds_offset = 8
-    extra_reg_offset = 12
-    window_size_offset = 18
-    ch_mask_bits_offset = 20
-    variance_offset = 0x1c
-
-    # Extract the 32-bit number (4 bytes) at offset 0
-    number = struct.unpack_from('>I', chunk, number_offset)[0]
+    # Extract the 32-bit event number (4 bytes) at offset 0
+    event_number = struct.unpack_from('>I', chunk, event_number_offset)[0]
 
     # Extract the UNIX timestamp seconds (4 bytes) at offset 4
     timestamp_seconds = struct.unpack_from('>I', chunk, timestamp_seconds_offset)[0]
@@ -669,7 +622,7 @@ def extract_data_from_chunk(chunk):
         variances.append(convert_to_decimal(variance_word))
 
     return {
-        'number': number,
+        'event_number': event_number,
         'timestamp': timestamp,
         'extra_reg1': extra_reg1,
         'extra_reg2': extra_reg2,
@@ -701,10 +654,10 @@ def save_to_fits(data, filename):
 
 def process_and_save_to_fits(binary_filename, fits_filename, max_events=None):
     data = []
-    for i, chunk in enumerate(read_binary_file_in_chunks(binary_filename)):
+    for i, chunk in enumerate(read_events_from_binary_file(binary_filename)):
         if max_events is not None and i >= max_events:
             break
-        parsed_data = extract_data_from_chunk(chunk)
+        parsed_data = parse_data_from_event(chunk)
         data.append(parsed_data)
     
     save_to_fits(data, fits_filename)
@@ -747,11 +700,11 @@ def process_and_save_to_fits_incrementally(binary_filename, fits_filename, max_e
     data = []
     event_count = 0
     
-    for i, chunk in enumerate(read_binary_file_in_chunks(binary_filename)):
+    for i, chunk in enumerate(read_events_from_binary_file(binary_filename)):
         if max_events is not None and i >= max_events:
             break
             
-        parsed_data = extract_data_from_chunk(chunk)
+        parsed_data = parse_data_from_event(chunk)
         data.append(parsed_data)
         event_count += 1
         
