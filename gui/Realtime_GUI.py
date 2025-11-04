@@ -386,6 +386,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #self.w5.setRange(xRange=[0, 1000], padding=0)
         self.w5.setMouseEnabled(x=False, y=True)
         self.firstFlip = False
+        self.firstFlipAuto = False
 
 
         self.roi1.sigRegionChanged.connect(self.updateROI)
@@ -596,8 +597,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.AutomateButton.setEnabled(True)
         self.StartButton.setEnabled(True)
         self.AutomateButton.setText("Start")
-        self.db_worker.observing_info_signal.disconnect(self.detect_observing_info_changes)
-
+        try:
+            self.db_worker.observing_info_signal.disconnect(self.detect_observing_info_changes)
+        except TypeError as e:
+            logger.log(logging.INFO, f'Could not disconnect observing_info_signal: {e}')
+        except Exception as e:
+            logger.log(logging.ERROR, f'Error disconnecting observing_info_signal: {e}')
 
     def update_sample_average(self):
         self.sample_average = self.data_display_sample_spin.value()
@@ -836,8 +841,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         if not self.firstFlip and self.check_VO_db_params_filled(self.get_VO_db_params_filled_short()):
             self.firstFlip = True
             self.StartButton.setEnabled(True)
-        if not self.firstFlip and self.check_VO_db_params_filled(self.get_VO_db_params_filled_mini()):
-            self.firstFlip = True
+        if not self.firstFlipAuto and self.check_VO_db_params_filled(self.get_VO_db_params_filled_mini()):
+            self.firstFlipAuto = True
             self.AutomateButton.setEnabled(True)
 
 
