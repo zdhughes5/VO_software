@@ -508,7 +508,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.update_VO_db_params()
 
-        self.populate_dt.clicked.connect(self.set_current_datetime)
+        #self.populate_dt.clicked.connect(self.set_current_datetime)
+        self.populate_dt.clicked.connect(self.unlock_start_button)
         self.wrtie_db.clicked.connect(self.write_VO_db_params_to_db)
 
         self.fadc_gate_array_window_set_button.clicked.connect(self.set_fadc_gate_array_window)
@@ -531,6 +532,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         self.sample_average = 1
 
         self.data_display_sample_button.clicked.connect(self.update_sample_average)
+        
+    def unlock_start_button(self):
+        self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
+        self.StartButton.setEnabled(True)
 
     def update_sample_average(self):
         self.sample_average = self.data_display_sample_spin.value()
@@ -638,18 +643,27 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             # Construct the SSH command
             ssh_command = f"ssh {options} -t {username}@{hostname} '{binary_path} {argument}'"
+            print(ssh_command)
             extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
             logger.log(logging.INFO, f'Sent request: {ssh_command}', extra=extra)
+            print('e')
             
             # Execute the command
             process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,  preexec_fn=lambda: signal.alarm(5))
-            
+            #process = subprocess.run(['/home/labuser/VO_software/gui/variance_script.sh'], capture_output=True, text=True, timeout=10)
+            print('f')
             # Read the output and error streams
+
             output, error = process.communicate()
-            
+            #except subprocess.TimeoutExpired:
+            #    process.kill()
+            #    stdout, stderr = process.communicate()
+            print('g')
             # Decode the output and error
             output = output.decode()
             error = error.decode()
+            #output = process.stdout
+            #error = process.stderr
 
             if output == '':
                 logger.log(logging.WARNING, f'Got no output from set_variance. Probably timed out. Did the window really get set?', extra=extra)
@@ -668,11 +682,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             fadc_data = json.load(f)
         ip = fadc_data['telescopes'][0]['crates'][0]['ip']
         username = fadc_data['telescopes'][0]['crates'][0]['username']
-        options = '-o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1'
+        options = fadc_data['telescopes'][0]['crates'][0]['commandOptions']
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
         #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
         #self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
+        #self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
+        #self.execute_binary_over_ssh(ip, username, 'ls', '-a', options=options)
 
     def set_current_datetime(self):
         self.VO_db_params_run_status_line.setText('ended')
