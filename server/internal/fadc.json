@@ -1,0 +1,44 @@
+{
+    "telescopes": [
+        {
+            "telescope": 1,
+            "missing": false,
+            "crates": [
+                {"position": 1, "missing": false, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "10.0.0.102", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 2, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30002", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 3, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30003", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 4, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30004", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"}
+            ]
+        },
+        {
+            "telescope": 2,
+            "missing": true,
+            "crates": [
+                {"position": 1, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30005", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 2, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30006", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 3, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30007", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 4, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30008", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"}
+            ]
+        },
+        {
+            "telescope": 3,
+            "missing": true,
+            "crates": [
+                {"position": 1, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30009", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 2, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30010", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 3, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30011", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 4, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30012", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"}
+            ]
+        },
+        {
+            "telescope": 4,
+            "missing": true,
+            "crates": [
+                {"position": 1, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30013", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 2, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30014", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 3, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30015", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
+                {"position": 4, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30016", "commandOptions": "XY -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"}
+            ]
+        }
+    ]
+}

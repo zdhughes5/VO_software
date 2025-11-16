@@ -1,6 +1,8 @@
 # Ignore Python bytecode files
 *.pyc
 *.pyo
+*.bin
+*.fits
 __pycache__/
 
 # Ignore virtual environment directories
@@ -20,6 +22,9 @@ server/bin/*
 fadc/src/server_unified.c
 fadc/src/clbt1.c
 fadc/testfadc/
+scrap
+logfile
+*.code-workspace
 
 # Ignore OS generated files
 .DS_Store
