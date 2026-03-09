@@ -685,8 +685,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         options = fadc_data['telescopes'][0]['crates'][0]['commandOptions']
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
         #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        #self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        #self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
+        #THIS BEFORE self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
+        self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
         #self.execute_binary_over_ssh(ip, username, 'ls', '-a', options=options)
 
     def set_current_datetime(self):

@@ -19,7 +19,7 @@ import (
 // Change these to test things.
 var (
 	controlConnIP string = "127.0.0.1:31250"
-	configFile    string = "../internal/state.json"
+	configFile    string = "../internal/states/states/state_veritas_2025.json"
 )
 
 type ctrlCmd uint32
