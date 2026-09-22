@@ -791,3 +791,120 @@ def reconstruct_channel_mask(ch_mask_low, ch_mask_high):
     else:
         return (int(ch_mask_high) << 64) | int(ch_mask_low)
 
+def extract_data(event):
+    # Offsets for the required data
+    number_offset = 0
+    timestamp_seconds_offset = 4
+    timestamp_nanoseconds_offset = 8
+    extra_reg_offset = 12
+    window_size_offset = 18
+    ch_mask_bits_offset = 20
+    variance_offset = 0x1c
+
+    # Extract the 32-bit number (4 bytes) at offset 0
+    number = struct.unpack_from('>I', event, number_offset)[0]
+
+    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
+    timestamp_seconds = struct.unpack_from('>I', event, timestamp_seconds_offset)[0]
+
+    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
+    timestamp_nanoseconds = struct.unpack_from('>I', event, timestamp_nanoseconds_offset)[0]
+
+    # Combine the seconds and nanoseconds to form a complete timestamp
+    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
+
+    # Extract the extra registers (6 bytes) at offset 12
+    extra_reg1 = struct.unpack_from('>H', event, extra_reg_offset)[0]
+    extra_reg2 = struct.unpack_from('>H', event, extra_reg_offset + 2)[0]
+    extra_reg3 = struct.unpack_from('>H', event, extra_reg_offset + 4)[0]
+
+    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
+    window_size_and_mask = struct.unpack_from('>H', event, window_size_offset)[0]
+    window_size = window_size_and_mask >> 13
+    ch_mask_bits_high = window_size_and_mask & 0x3F
+
+    # Extract the 64-bit channel mask at offset 20
+    ch_mask_bits_low = struct.unpack_from('>Q', event, ch_mask_bits_offset)[0]
+
+    # Combine the 6 bits with the 64-bit number to form the full channel mask
+    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
+
+    # Extract the variances (280 bytes) starting at offset 28
+    variances = []
+    for i in range(70):
+        variance_word = struct.unpack_from('>I', event, variance_offset + i * 4)[0]
+        variances.append(convert_to_decimal(variance_word))
+
+    return {
+        'number': number,
+        'timestamp': timestamp,
+        'extra_reg1': extra_reg1,
+        'extra_reg2': extra_reg2,
+        'extra_reg3': extra_reg3,
+        'window_size': window_size,
+        'ch_mask_bits': ch_mask_bits,
+        'variances': variances
+    }
+
+def read_binary_file_in_chunks(filename, chunk_size=308):
+    with open(filename, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if len(chunk) < chunk_size:
+                break  # End of file or incomplete chunk
+            yield chunk
+
+def extract_data_from_chunk(chunk):
+    # Offsets for the required data
+    number_offset = 0
+    timestamp_seconds_offset = 4
+    timestamp_nanoseconds_offset = 8
+    extra_reg_offset = 12
+    window_size_offset = 18
+    ch_mask_bits_offset = 20
+    variance_offset = 0x1c
+
+    # Extract the 32-bit number (4 bytes) at offset 0
+    number = struct.unpack_from('>I', chunk, number_offset)[0]
+
+    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
+    timestamp_seconds = struct.unpack_from('>I', chunk, timestamp_seconds_offset)[0]
+
+    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
+    timestamp_nanoseconds = struct.unpack_from('>I', chunk, timestamp_nanoseconds_offset)[0]
+
+    # Combine the seconds and nanoseconds to form a complete timestamp
+    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
+
+    # Extract the extra registers (6 bytes) at offset 12
+    extra_reg1 = struct.unpack_from('>H', chunk, extra_reg_offset)[0]
+    extra_reg2 = struct.unpack_from('>H', chunk, extra_reg_offset + 2)[0]
+    extra_reg3 = struct.unpack_from('>H', chunk, extra_reg_offset + 4)[0]
+
+    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
+    window_size_and_mask = struct.unpack_from('>H', chunk, window_size_offset)[0]
+    window_size = window_size_and_mask >> 13
+    ch_mask_bits_high = window_size_and_mask & 0x3F
+
+    # Extract the 64-bit channel mask at offset 20
+    ch_mask_bits_low = struct.unpack_from('>Q', chunk, ch_mask_bits_offset)[0]
+
+    # Combine the 6 bits with the 64-bit number to form the full channel mask
+    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
+
+    # Extract the variances (280 bytes) starting at offset 28
+    variances = []
+    for i in range(70):
+        variance_word = struct.unpack_from('>I', chunk, variance_offset + i * 4)[0]
+        variances.append(convert_to_decimal(variance_word))
+
+    return {
+        'number': number,
+        'timestamp': timestamp,
+        'extra_reg1': extra_reg1,
+        'extra_reg2': extra_reg2,
+        'extra_reg3': extra_reg3,
+        'window_size': window_size,
+        'ch_mask_bits': ch_mask_bits,
+        'variances': variances
+    }

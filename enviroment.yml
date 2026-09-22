@@ -1,4 +1,4 @@
-name: optical
+name: optical9
 channels:
   - conda-forge
   - defaults

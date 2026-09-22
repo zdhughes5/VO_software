@@ -1,0 +1,46 @@
+# Fit parameters for fit_gaussian.py
+# Run with: python fit_gaussian.py <binary_file> <channel> guesses.yaml
+
+# Index range of the fit window (original plot indices)
+start_idx: 60000
+end_idx: 169000
+
+# Initial guesses for the core Gaussian + baseline parameters.
+# mu is in original plot index space (will be converted internally).
+#initial_guess:
+#  A: 3.0
+#  mu: 130000
+#  sigma: 50000
+#  c: 108
+
+initial_guess:
+  A: 3.99788
+  mu: 130168.4 #70168.4
+  sigma: 14948.4
+  #c: 107.284
+
+# List of discontinuities: one entry per step/offset region boundary.
+# 'location' is the original plot index where the discontinuity occurs.
+# 'offset'   is the additive baseline shift applied after that boundary.
+# Both also serve as the initial guess passed to the optimizer.
+discontinuities:
+  - location: 63100
+    offset: 107.284
+  - location: 78400
+    offset: 0.0
+  - location: 81300
+    offset: 0.0
+  - location: 87900
+    offset: 0.0
+  - location: 93800
+    offset: 0.0
+  - location: 108900
+    offset: 0.0
+  - location: 124700
+    offset: 0.0
+  - location: 139600
+    offset: 0.0
+  - location: 155200
+    offset: 0.0
+  - location: 167579
+    offset: 0.0

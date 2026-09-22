@@ -1,0 +1,63 @@
+# break_finder.py configuration
+# Run with: python break_finder.py <binary_file> break_finder.yaml
+
+# Channel index to analyze (0-based)
+channel: 1
+
+# Index range to analyze (optional — omit or set to null for full range)
+start_idx: null
+end_idx:   null
+
+# Moving average filter applied before differencing.
+# Larger windows suppress high-frequency noise but may smear sharp edges.
+moving_average:
+  window_size: 3
+
+# Number of times np.diff is applied to the smoothed signal.
+# 1 = first difference (detects steps), 2 = second difference (detects curvature changes).
+diff_order: 2
+diff_enabled: false   # set to false to hide the diff plot panel
+
+# scipy.signal.find_peaks parameters for the diff approach.
+# Set any key to null (or omit it) to leave it unconstrained.
+# abs_value: if true, peaks are detected on |diff| so both up- and down-steps are found.
+peak_finding:
+  abs_value:  true
+  height:     null      # minimum absolute signal height to qualify as a peak
+  threshold:  null      # minimum vertical distance to neighboring samples
+  distance:   5000      # minimum horizontal separation between peaks (samples)
+  prominence: 10.05      # minimum prominence — key knob for sensitivity
+  width:      null      # minimum peak width (samples)
+
+# High-pass filter: subtracts a long moving average (low-pass) from the raw signal
+# to remove the slow Gaussian envelope, exposing only the step discontinuities.
+# Peak finding is then run on |diff(residual)|.
+# Omit the peak_finding block here to inherit the top-level peak_finding settings.
+high_pass:
+  enabled:     false     # set to false to skip the high-pass approach entirely
+  window_size: 15000    # must be long enough to span the full Gaussian (~sigma scale)
+  peak_finding:
+    abs_value:  true
+    height:     null
+    threshold:  null
+    distance:   5000    # min separation between detected breaks (samples)
+    prominence: 0.05    # sensitivity — lower finds more peaks
+    width:      null
+
+# Step-function convolution approach.
+# The signal is convolved with a bipolar kernel [+1...+1, -1...-1] of total
+# width 2*half_width.  The result peaks sharply at step discontinuities.
+# half_width should be on the order of the expected "flat" segment length
+# between breaks — roughly the spacing between discontinuities / 2.
+# demean: subtract the global mean before convolving (recommended).
+step_convolution:
+  enabled:     true
+  half_width:  1500     # half-width of the step kernel (samples)
+  demean:      true     # subtract global mean before convolving
+  peak_finding:
+    abs_value:  true    # detect both up- and down-steps via |conv|
+    height:     400
+    threshold:  null
+    distance:   null    # min separation between peaks (samples)
+    prominence: 200    # leave unconstrained; tune height instead
+    width:      [0, 2000] 
