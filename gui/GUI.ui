@@ -702,6 +702,16 @@
                </property>
               </widget>
              </item>
+             <item>
+              <widget class="QPushButton" name="data_display_star_options_button">
+               <property name="toolTip">
+                <string>Set the magnitude range, the label threshold and which identifier labels the stars.</string>
+               </property>
+               <property name="text">
+                <string>Star Options</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </item>
            <item>

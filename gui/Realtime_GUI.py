@@ -36,6 +36,7 @@ import time
 from multiprocessing import Process, Queue
 from db_worker_process import query_last_pointing, parse_vdb_timestamp
 import star_field
+import star_options
 import json
 import resources_rc
 import os
@@ -61,6 +62,48 @@ logger.setLevel(logging.DEBUG)
 # A pointing row older than this is treated as "positioner parked": its alt/az
 # is still where the telescope points, but the sky has moved on.
 MAX_POINTING_AGE_S = 60.0
+
+# Star overlay display settings, persisted to STAR_DISPLAY_FILE.
+# The default plots to V=7 and labels to V=6: measured Hipparcos counts inside
+# the 2 deg FOV cut run to 80 stars at full depth near the galactic plane, which
+# is far more text than a 3.5 deg camera panel can carry.
+STAR_DISPLAY_FILE = 'star_display.json'
+DEFAULT_STAR_DISPLAY = {
+    'mag_min': -2.0,
+    'mag_max': 7.0,
+    'label_mag_max': 6.0,
+    'label_scheme': 'best',
+}
+
+
+def load_star_display_settings(path=STAR_DISPLAY_FILE):
+    """Read persisted overlay settings, falling back to the defaults."""
+    settings = dict(DEFAULT_STAR_DISPLAY)
+    try:
+        with open(path, 'r') as f:
+            stored = json.load(f)
+    except FileNotFoundError:
+        return settings
+    except (OSError, ValueError) as e:
+        logger.log(logging.WARNING, f"Could not read {path} ({e}); using default star display settings.",
+                   extra={'qThreadName': 'MainThread'})
+        return settings
+
+    for key in DEFAULT_STAR_DISPLAY:
+        if key in stored:
+            settings[key] = stored[key]
+    if settings['label_scheme'] not in star_field.LABEL_SCHEMES:
+        settings['label_scheme'] = DEFAULT_STAR_DISPLAY['label_scheme']
+    return settings
+
+
+def save_star_display_settings(settings, path=STAR_DISPLAY_FILE):
+    try:
+        with open(path, 'w') as f:
+            json.dump(settings, f, indent=2)
+    except OSError as e:
+        logger.log(logging.WARNING, f"Could not save {path} ({e}).",
+                   extra={'qThreadName': 'MainThread'})
 
 
 def format_sexagesimal(angle):
@@ -126,7 +169,8 @@ class database_worker(QtCore.QObject):
         self.running = False
         self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
-        self.stars, self.star_names = star_field.load_star_catalog('catalogs/asu2.dat')
+        self.catalog = star_field.load_star_catalog()
+        self.star_display = dict(DEFAULT_STAR_DISPLAY)
         self.queue_check_counter = 0
         self.queue_check_interval = 2.5
         self.maximum_queue_checks = 5
@@ -251,6 +295,8 @@ class database_worker(QtCore.QObject):
         star_field_data = {}
         star_offsets = []
         star_offsets_labels = []
+        star_sizes = []
+        star_descriptions = []
 
         for telescope in ['t1', 't2', 't3', 't4']:
             row = vpm[telescope]
@@ -261,13 +307,43 @@ class database_worker(QtCore.QObject):
             )
             # Camera coordinates, not raw alt/az offsets: the elevation axis is
             # flipped in the VERITAS camera frame. See star_field.py.
-            labels, xs, ys = star_field.stars_in_fov(self.stars, self.star_names, current_pointing)
+            s = self.star_display
+            labels, xs, ys, vmag, descriptions = star_field.stars_in_fov(
+                self.catalog, current_pointing,
+                mag_min=s['mag_min'], mag_max=s['mag_max'],
+                label_mag_max=s['label_mag_max'], label_scheme=s['label_scheme'],
+            )
             star_offsets.append(list(zip(xs, ys)))
             star_offsets_labels.append(labels)
+            star_sizes.append(star_field.marker_sizes(vmag))
+            star_descriptions.append(descriptions)
         star_field_data['offsets'] = star_offsets
         star_field_data['labels'] = star_offsets_labels
+        star_field_data['sizes'] = star_sizes
+        star_field_data['descriptions'] = star_descriptions
 
         self.star_field_signal.emit(star_field_data)
+
+    @QtCore.pyqtSlot(dict)
+    def apply_star_display(self, settings):
+        """Take new display settings from the options window.
+
+        Invoked across the thread boundary, so Qt queues it onto this worker's
+        thread; the dict is copied rather than shared.
+        """
+        self.star_display.update(settings)
+
+    @QtCore.pyqtSlot(dict)
+    def recompute_star_field(self, vpm):
+        """Redraw the overlay from a pointing we already have.
+
+        Lets a threshold drag take effect at once instead of at the next poll.
+        """
+        try:
+            self.calculate_star_offsets(vpm)
+        except Exception as e:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName()}
+            logger.log(logging.ERROR, f"Could not recompute the star field: {e}", extra=extra)
 
     def stop(self):
         self.stop_querying()
@@ -501,6 +577,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         # demand rather than only when a fresh row happens to arrive.
         self.last_vpm = None
         self.data_display_pointing_button.clicked.connect(self.printPointing)
+
+        # Star overlay display settings. Held here rather than on the worker so
+        # they survive the SQL thread being stopped and restarted.
+        self.star_display = load_star_display_settings()
+        self.star_options_dialog = None
+        self.data_display_star_options_button.clicked.connect(self.openStarOptions)
 
         self.data_display_clear_ts_button.clicked.connect(self.clear_time_series_data)
         self.veritas_sql_ping_button.clicked.connect(self.ping_veritas_sql)
@@ -1130,11 +1212,16 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.db_worker.star_field_signal.connect(self.draw_star_field)
             self.db_worker.query_ok_signal.connect(self.veritas_sql_status)
 
+            # The worker starts on its defaults; hand it the persisted overlay
+            # settings before it computes its first field.
+            self.db_worker.apply_star_display(dict(self.star_display))
+
             # Start the thread
             self.db_thread.start()
             self.startWorkerSignal.emit()
             self.db_worker_active = True
             logger.log(logging.INFO, "Started VERITAS SQL database thread.", extra=extra)
+            logger.log(logging.INFO, f"Star catalog: {len(self.db_worker.catalog):,} stars.", extra=extra)
 
     def veritas_sql_status(self, ok):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -1227,6 +1314,51 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def requestStarField(self):
         self.star_field_request = True
+
+    def openStarOptions(self):
+        """Show the non-modal Star Field Options window.
+
+        The catalog is only loaded inside database_worker, so the dialog needs
+        the SQL thread running -- that is also the only state in which changing
+        the settings would show anything.
+        """
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName()}
+
+        if self.star_options_dialog is not None:
+            self.star_options_dialog.show()
+            self.star_options_dialog.raise_()
+            self.star_options_dialog.activateWindow()
+            return
+
+        if not self.db_worker_active or self.db_worker is None:
+            logger.log(logging.WARNING, "Star options need the star catalog -- start the VERITAS SQL database thread first.", extra=extra)
+            return
+
+        self.star_options_dialog = star_options.StarOptionsDialog(
+            self.db_worker.catalog, self.star_display, DEFAULT_STAR_DISPLAY, parent=self)
+        self.star_options_dialog.settings_changed.connect(self.applyStarDisplay)
+        self.star_options_dialog.show()
+
+    def applyStarDisplay(self, settings):
+        """Push new overlay settings to the worker and redraw immediately."""
+        self.star_display.update(settings)
+        save_star_display_settings(self.star_display)
+
+        if self.db_worker is None:
+            return
+
+        # Queued across the thread boundary by Qt, so the worker mutates its
+        # own copy on its own thread.
+        QtCore.QMetaObject.invokeMethod(
+            self.db_worker, 'apply_star_display', QtCore.Qt.ConnectionType.QueuedConnection,
+            QtCore.Q_ARG(dict, dict(self.star_display)))
+
+        # Redraw from the last pointing rather than waiting out the 2.5 s poll,
+        # so dragging a threshold changes the camera panels as you drag.
+        if self.last_vpm:
+            QtCore.QMetaObject.invokeMethod(
+                self.db_worker, 'recompute_star_field', QtCore.Qt.ConnectionType.QueuedConnection,
+                QtCore.Q_ARG(dict, dict(self.last_vpm)))
 
     def calculate_telescope_mask(self):
         mask = 0
@@ -1440,6 +1572,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             self.db_thread.wait()
 
     def closeEvent(self, event):
+        if self.star_options_dialog is not None:
+            self.star_options_dialog.close()
         self.stopWorker()
         self.stop_server() # Make a purpose-built function to stop the server
         event.accept()
@@ -1521,6 +1655,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #print("star_positions", array_star_positions)
         array_star_positions = star_field_data['offsets']
         array_star_labels = star_field_data['labels']
+        array_star_sizes = star_field_data.get('sizes')
+        array_star_descriptions = star_field_data.get('descriptions')
         #print(self.star_field_labels)
         for i in range(4):
             if self.star_field[i] is not None:
@@ -1534,19 +1670,24 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
             if len(star_positions) > 0:
                 # star_field.stars_in_fov emits camera (x, y) pairs.
                 xs, ys = list(zip(*star_positions))
+                # Brighter stars draw larger; hovering shows every identifier
+                # the star has, so the compact on-camera label can stay short.
+                sizes = array_star_sizes[i] if array_star_sizes is not None else 20
+                hover_data = (array_star_descriptions[i]
+                              if array_star_descriptions is not None
+                              else array_star_labels[i])
                 scatter_plot = pg.ScatterPlotItem(
                     x=xs,
                     y=ys,
                     brush=pg.mkColor('r'),
-                    size=20,
+                    size=sizes,
                     pen=border_pen,
-                    hoverSize=25,
                     symbol='star',
                     pxMode=True,  # Set pxMode=False to allow spots to transform with the view
                     hoverable=True,
                     useCache=True,
                     antialias=False,
-                    data=array_star_labels[i]
+                    data=hover_data
                 )
                 self.star_field[i] = scatter_plot
                 self.ws[i].addItem(scatter_plot)
@@ -1555,8 +1696,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 font.setBold(True)
                 text_items = []
                 for j, point in enumerate(scatter_plot.points()):
+                    # Stars fainter than the label threshold get an empty
+                    # label; skip them rather than parenting an empty item.
+                    text = str(array_star_labels[i][j])
+                    if not text:
+                        continue
                     x, y = point.pos()
-                    text_item = pg.TextItem(text=array_star_labels[i][j], anchor=(0, 0.75))
+                    text_item = pg.TextItem(text=text, anchor=(0, 0.75))
                     text_item.setParentItem(scatter_plot)
                     text_item.setPos(x, y)
                     text_item.setFont(font)
@@ -1573,7 +1719,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 print_string += f"___________________________________\n"
                 for j, star in enumerate(array_star_labels[i]):
                     x, y = array_star_positions[i][j]
-                    print_string += f"Star {j+1}: {star}\n"
+                    # The dump carries every identifier, not just the compact
+                    # on-camera label -- that is what gets cross-referenced.
+                    full = (array_star_descriptions[i][j]
+                            if array_star_descriptions is not None else star)
+                    print_string += f"Star {j+1}: {full}\n"
                     print_string += f"Camera x, y (deg): {x:+.3f}, {y:+.3f}\n"
                     print_string += f"-----------------------------------\n"
             logger.log(logging.INFO, print_string, extra=extra)

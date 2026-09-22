@@ -33,6 +33,10 @@ Thumbs.db
 server/holder
 db/
 
+# Per-machine star overlay settings, written by the Star Options window.
+# Regenerated from DEFAULT_STAR_DISPLAY when absent.
+gui/star_display.json
+
 # Reference material, not part of this repo (577 MB incl. tarballs).
 # Eventdisplay source + analysis files. Used to derive the camera-frame
 # convention; the derivation with file:line citations is recorded in

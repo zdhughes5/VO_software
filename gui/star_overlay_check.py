@@ -130,6 +130,46 @@ def verify_camera_transform(n=400, seed=0):
     return worst
 
 
+def verify_catalog():
+    """The catalog must load, and its identifiers must resolve."""
+    catalog = star_field.load_star_catalog()
+    print(f'      {len(catalog):,} stars loaded')
+
+    # Magnitude counts, as reported by scripts/build_star_catalog.py.
+    for m, expected in ((6, 4992), (7, 15397), (8, 41057), (9, 82984)):
+        got = int((catalog.vmag < m).sum())
+        print(f'      V < {m}:  {got:>8,}   (build reported {expected:,})')
+        assert abs(got - expected) <= 1, f'V<{m}: {got} != {expected}'
+
+    known = {'Polaris': ('alpha UMi', 11767, 8890, 424),
+             'Vega': ('alpha Lyr', 91262, 172167, 7001),
+             'Sirius': ('alpha CMa', 32349, 48915, 2491)}
+    for name, (bayer, hip, hd, hr) in known.items():
+        idx = np.nonzero(catalog.ids['proper_name'] == name)[0]
+        assert len(idx) == 1, f'{name}: found {len(idx)} matches, expected 1'
+        i = int(idx[0])
+        assert catalog.label(i, 'best') == name
+        assert catalog.label(i, 'bayer_flamsteed') == bayer, catalog.label(i, 'bayer_flamsteed')
+        assert catalog.label(i, 'hip') == f'HIP {hip}'
+        assert catalog.label(i, 'hd') == f'HD {hd}'
+        assert catalog.label(i, 'hr') == f'HR {hr}'
+        print(f'      {name:<8} {catalog.describe(i)}')
+
+    # The complaint that started this: anonymous stars must still be
+    # cross-referencable, never a coordinate pseudo-name.
+    anon = np.nonzero((catalog.ids['proper_name'] == '') &
+                      (catalog.ids['bayer_flamsteed'] == ''))[0]
+    assert len(anon) > 100000 - 20000, f'only {len(anon):,} anonymous stars?'
+    sample = [catalog.label(int(i), 'best') for i in anon[:500]]
+    assert all(s and not s.startswith('(') for s in sample), 'anonymous star has no usable label'
+    print(f'      {len(anon):,} stars without a name fall back to catalog IDs, '
+          f'e.g. {sample[0]!r}')
+
+    # Pinning a scheme must leave stars lacking it unlabelled.
+    assert catalog.label(int(anon[0]), 'proper_name') == ''
+    print('PASS  catalog loads; identifiers and label schemes resolve')
+
+
 def verify_timestamp_parsing():
     """VERITAS packed-decimal pointing timestamps must decode to UTC.
 
@@ -211,33 +251,40 @@ def self_test():
     print('PASS  elevation axis is flipped, as the VERITAS camera frame requires')
 
 
-def show_field(alt_deg, az_deg, time_iso=None):
+def show_field(alt_deg, az_deg, time_iso=None, mag_max=9.0, label_mag_max=None,
+               label_scheme='best'):
     """Print what the overlay would draw for one pointing."""
     obstime = Time(time_iso) if time_iso else Time.now()
-    stars, names = star_field.load_star_catalog()
+    catalog = star_field.load_star_catalog()
     layout = star_field.load_pixel_layout()
 
     pointing = SkyCoord(
         alt=alt_deg*u.deg, az=az_deg*u.deg,
         location=BASECAMP, obstime=obstime, frame='altaz',
     )
-    labels, xs, ys = star_field.stars_in_fov(stars, names, pointing)
+    labels, xs, ys, vmag, descriptions = star_field.stars_in_fov(
+        catalog, pointing, mag_max=mag_max,
+        label_mag_max=label_mag_max, label_scheme=label_scheme,
+    )
 
     radec = pointing.transform_to('icrs')
     print(f'Pointing  alt {alt_deg:.3f}  az {az_deg:.3f}   at {obstime.iso} UTC')
     print(f'          RA {radec.ra.degree:.4f}  Dec {radec.dec.degree:+.4f}')
-    print(f'Stars within {star_field.FOV_RADIUS_DEG} deg: {len(labels)}')
+    print(f'Catalog {len(catalog):,} stars;  V <= {mag_max} inside '
+          f'{star_field.FOV_RADIUS_DEG} deg: {len(labels)}')
 
     if not len(labels):
         return
 
-    order = np.argsort(np.hypot(xs, ys))
-    print(f'\n{"star":<22} {"cam x":>8} {"cam y":>8} {"pixel":>6} {"d(pix)":>8}')
-    print('-' * 56)
+    order = np.argsort(vmag)
+    print(f'\n{"label":<18} {"V":>5} {"cam x":>8} {"cam y":>8} {"pixel":>6} {"d(pix)":>7}   identifiers')
+    print('-' * 110)
     for i in order:
         pixel, dist = star_field.nearest_pixel(xs[i], ys[i], layout)
-        inside = '' if dist < 0.09 else '   (between pixels)'
-        print(f'{labels[i]:<22} {xs[i]:+8.3f} {ys[i]:+8.3f} {pixel:>6} {dist:>8.3f}{inside}')
+        between = '' if dist < 0.09 else ' *'
+        print(f'{str(labels[i]) or "-":<18} {vmag[i]:5.2f} {xs[i]:+8.3f} {ys[i]:+8.3f} '
+              f'{pixel:>6} {dist:>7.3f}{between:<2} {descriptions[i]}')
+    print('\n* nearest pixel is more than half a pixel away (star falls between pixels)')
 
 
 def main():
@@ -250,11 +297,18 @@ def main():
     ap.add_argument('--alt', type=float, help='pointing elevation in degrees')
     ap.add_argument('--az', type=float, help='pointing azimuth in degrees, north through east')
     ap.add_argument('--time', help='UTC ISO time; default now')
+    ap.add_argument('--mag-max', type=float, default=9.0,
+                    help='faintest star to plot (default 9)')
+    ap.add_argument('--label-mag-max', type=float, default=None,
+                    help='faintest star to label (default: same as --mag-max)')
+    ap.add_argument('--label-scheme', default='best', choices=star_field.LABEL_SCHEMES,
+                    help='identifier used for the label (default best available)')
     args = ap.parse_args()
 
     if args.verify_reference:
         verify_pixel_layout()
         verify_camera_transform()
+        verify_catalog()
         verify_timestamp_parsing()
         return 0
 
@@ -265,7 +319,8 @@ def main():
     if args.alt is None or args.az is None:
         ap.error('give --alt and --az, or --verify-reference, or --self-test')
 
-    show_field(args.alt, args.az, args.time)
+    show_field(args.alt, args.az, args.time, mag_max=args.mag_max,
+               label_mag_max=args.label_mag_max, label_scheme=args.label_scheme)
     return 0
 
 
