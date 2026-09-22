@@ -20,6 +20,32 @@ Four largely independent subsystems in one repo:
 | `scripts/` | Python | Offline analysis of recorded `.bin` run files |
 | `fadc/` | C | FADC crate library and `set_variance` utility (runs on the VME machine, not here) |
 
+## Required: record every plan and its outcome in `docs/`
+
+Any implementation work that is planned before being carried out — plan mode, an
+approved multi-step plan, a task executed from a written plan — **must** leave two
+files in [docs/](docs/):
+
+```
+docs/YYYY-MM-DD-<slug>-plan.md       saved BEFORE the first implementation edit
+docs/YYYY-MM-DD-<slug>-summary.md    saved AFTER execution finishes
+```
+
+Both files share one kebab-case `<slug>`; append `-2` if a slug repeats on a date.
+Commit them along with the work. [docs/README.md](docs/README.md) specifies what each
+file contains.
+
+Two rules that make these worth referencing later:
+
+- Save the plan file **before** editing code, not reconstructed afterwards. A plan
+  written after the fact records what happened, not what was intended, and loses the
+  assumptions that are the reason to keep it.
+- The summary must record deviations, skipped work and real verification output. A
+  summary that only reports success is not worth keeping.
+
+This applies to planned implementation work. Answering a question, a one-line fix, or
+exploratory reading does not need a plan pair.
+
 ## Git workflow
 
 **Work on `master`.** As of 2026-09-21 `master` is the working branch and holds the

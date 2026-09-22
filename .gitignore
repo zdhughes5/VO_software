@@ -22,6 +22,9 @@ server/bin/*
 fadc/src/server_unified.c
 fadc/src/clbt1.c
 fadc/testfadc/
+.claude/
+CLAUDE.md
+docs/
 
 # Ignore OS generated files
 .DS_Store
@@ -29,3 +32,10 @@ Thumbs.db
 
 server/holder
 db/
+
+# Reference material, not part of this repo (577 MB incl. tarballs).
+# Eventdisplay source + analysis files. Used to derive the camera-frame
+# convention; the derivation with file:line citations is recorded in
+# docs/2026-09-21-star-overlay-camera-orientation-plan.md so it survives
+# without this tree.
+ref/

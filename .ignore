@@ -1,0 +1,29 @@
+# Tooling visibility, independent of git.
+#
+# .gitignore keeps these out of commits. This file re-exposes them to
+# ripgrep-based search and file-listing tools, which honor .ignore ahead of
+# .gitignore. Nothing here affects what git tracks.
+#
+# Not negated on purpose:
+#   db/              live PostgreSQL cluster, owned by postgres and unreadable
+#                    (negating it only produces "Permission denied" noise)
+#   __pycache__/     build artifacts, no reason to search
+#   server/bin/*     compiled binaries
+#   ref/*.tar.gz     the extracted trees next to them are what you want
+#
+# ref/ is re-exposed: it holds the Eventdisplay reference implementation, and
+# grepping it is how the camera-frame convention was settled. rg skips the
+# binaries in it on its own.
+
+!*.bin
+!*.fits
+!*.log
+!server/cmd/server/log.txt
+!server/cmd/server/server
+!server/cmd/send_command/send_command
+!server/bin/*
+!fadc/src/server_unified.c
+!fadc/src/clbt1.c
+!fadc/testfadc/
+!ref/
+ref/*.tar.gz
