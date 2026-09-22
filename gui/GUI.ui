@@ -51,7 +51,7 @@
              <property name="font">
               <font>
                <family>Sans Serif</family>
-               <pointsize>27</pointsize>
+               <pointsize>24</pointsize>
                <weight>75</weight>
                <bold>true</bold>
                <underline>false</underline>
@@ -692,6 +692,16 @@
                </property>
               </widget>
              </item>
+             <item>
+              <widget class="QPushButton" name="data_display_pointing_button">
+               <property name="toolTip">
+                <string>Print the current telescope pointings as Az/Alt sexagesimal, ready to paste into Stellarium's search window.</string>
+               </property>
+               <property name="text">
+                <string>Print Pointing</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </item>
            <item>
@@ -851,7 +861,7 @@
           <property name="minimumSize">
            <size>
             <width>800</width>
-            <height>1000</height>
+            <height>700</height>
            </size>
           </property>
           <property name="maximumSize">

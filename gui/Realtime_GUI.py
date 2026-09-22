@@ -28,13 +28,14 @@ import logging
 from string import ascii_lowercase as alc
 from string import ascii_uppercase as auc
 import pymysql
-from astropy.coordinates import AltAz, SkyCoord, EarthLocation
+from astropy.coordinates import Angle, SkyCoord, EarthLocation
 from astropy.time import Time
 from astropy import units as u
 import astroplan as apl
 import time
 from multiprocessing import Process, Queue
-from db_worker_process import query_last_pointing
+from db_worker_process import query_last_pointing, parse_vdb_timestamp
+import star_field
 import json
 import resources_rc
 import os
@@ -55,6 +56,21 @@ formatter = logging.Formatter(fs)
 logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+# A pointing row older than this is treated as "positioner parked": its alt/az
+# is still where the telescope points, but the sky has moved on.
+MAX_POINTING_AGE_S = 60.0
+
+
+def format_sexagesimal(angle):
+    """Format an Angle as +DDD MM' SS.ss", e.g. +359 59' 21.53".
+
+    This is the shape Stellarium's search window accepts, so the output can be
+    pasted straight in.
+    """
+    return angle.to_string(unit=u.deg, sep=('° ', "' ", '"'),
+                           precision=2, alwayssign=True, pad=True)
 
 
 class LogSignalEmitter(QtCore.QObject):
@@ -110,15 +126,16 @@ class database_worker(QtCore.QObject):
         self.running = False
         self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
-        with open('catalogs/asu2.dat', 'r') as f:
-            lines = [x for x in f]
-        self.star_names = np.array([x.split()[0] for x in lines])
-        star_RA_deg = np.array([float(x.split()[1]) for x in lines])
-        star_DEC_deg = np.array([float(x.split()[2]) for x in lines])
-        self.stars = SkyCoord(ra=star_RA_deg*u.deg, dec=star_DEC_deg*u.deg)
+        self.stars, self.star_names = star_field.load_star_catalog('catalogs/asu2.dat')
         self.queue_check_counter = 0
         self.queue_check_interval = 2.5
         self.maximum_queue_checks = 5
+
+        # A pointing row older than this is treated as "positioner parked":
+        # keep its alt/az, but draw the stars that are there now.
+        self.max_pointing_age_s = MAX_POINTING_AGE_S
+        self.log_throttle_interval = 300.0
+        self.log_throttle_state = {}
 
         # Database configuration
         self.db_config = {
@@ -178,24 +195,75 @@ class database_worker(QtCore.QObject):
                     logger.log(logging.WARNING, "Haven't got pointing from VERITAS MySQL DB worker in %d seconds" % (self.queue_check_counter*self.queue_check_interval), extra=extra)
 
 
+    def log_throttled(self, key, level, message):
+        """Log a recurring condition at most once every throttle_interval.
+
+        The pointing poll runs every 2.5 s for four telescopes, so an
+        unthrottled complaint about a stale row is ~96 log lines a minute --
+        enough to bury everything else in the GUI log.
+        """
+        now = time.time()
+        if now - self.log_throttle_state.get(key, 0.0) < self.log_throttle_interval:
+            return
+
+        self.log_throttle_state[key] = now
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName()}
+        logger.log(level, message, extra=extra)
+
+    def pointing_obstime(self, telescope, row):
+        """Time to place stars at for one telescope's pointing row.
+
+        The row's own timestamp is preferred over the wall clock, which lags it
+        by up to the poll interval.
+
+        A row far from the present is not trusted. While the positioner is
+        parked its last status row can be hours old, and the telescope has not
+        moved since -- so the stars to draw are the ones at that pointing
+        *now*, not the ones that were there when the row was written. Falling
+        back to the current time is the right answer for a stale row, and it
+        also contains the damage if the stored timezone is ever not UTC.
+        """
+        stamp = row.get('timestamp')
+        if stamp is None:
+            return Time.now()
+
+        try:
+            obstime = Time(parse_vdb_timestamp(stamp), scale='utc')
+        except Exception as e:
+            self.log_throttled(
+                (telescope, 'unparseable'), logging.ERROR,
+                f"Could not read {telescope} pointing timestamp {stamp!r} ({e}); using current time.",
+            )
+            return Time.now()
+
+        skew = (Time.now() - obstime).to_value(u.s)
+        if abs(skew) > self.max_pointing_age_s:
+            self.log_throttled(
+                (telescope, 'stale'), logging.WARNING,
+                f"{telescope} pointing row is {skew/60.0:+.1f} min from now (positioner parked, or "
+                f"the timestamp is not UTC); drawing stars for the current time instead.",
+            )
+            return Time.now()
+
+        return obstime
+
     def calculate_star_offsets(self, vpm):
-        current_time = Time.now()
-        stars_altaz = self.stars.transform_to(AltAz(obstime=current_time, location=self.basecamp))
         star_field_data = {}
         star_offsets = []
         star_offsets_labels = []
 
         for telescope in ['t1', 't2', 't3', 't4']:
-            current_pointing = SkyCoord(alt=vpm[telescope]['elevation_raw']*u.rad, az=vpm[telescope]['azimuth_raw']*u.rad, location=self.basecamp, obstime=current_time, frame='altaz')
-            separation = current_pointing.separation(stars_altaz)
-            stars_in_fov = stars_altaz[separation < 2*u.deg]
-            dazs, dalts = current_pointing.spherical_offsets_to(stars_in_fov)
-            dazs_deg = dazs.degree
-            dalts_deg = dalts.degree
-            stars_offsets_in_fov = list(zip(dalts_deg, dazs_deg))
-            star_offsets_labels_in_fov = self.star_names[separation < 2*u.deg]
-            star_offsets.append(stars_offsets_in_fov)
-            star_offsets_labels.append(star_offsets_labels_in_fov)
+            row = vpm[telescope]
+            obstime = self.pointing_obstime(telescope, row)
+            current_pointing = SkyCoord(
+                alt=row['elevation_raw']*u.rad, az=row['azimuth_raw']*u.rad,
+                location=self.basecamp, obstime=obstime, frame='altaz',
+            )
+            # Camera coordinates, not raw alt/az offsets: the elevation axis is
+            # flipped in the VERITAS camera frame. See star_field.py.
+            labels, xs, ys = star_field.stars_in_fov(self.stars, self.star_names, current_pointing)
+            star_offsets.append(list(zip(xs, ys)))
+            star_offsets_labels.append(labels)
         star_field_data['offsets'] = star_offsets
         star_field_data['labels'] = star_offsets_labels
 
@@ -428,6 +496,11 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         # Connect signals to mark widgets as modified
         self.star_field_request = False
         self.data_display_star_field_button.clicked.connect(self.requestStarField)
+
+        # Most recent pointing rows, kept so the pointing can be printed on
+        # demand rather than only when a fresh row happens to arrive.
+        self.last_vpm = None
+        self.data_display_pointing_button.clicked.connect(self.printPointing)
 
         self.data_display_clear_ts_button.clicked.connect(self.clear_time_series_data)
         self.veritas_sql_ping_button.clicked.connect(self.ping_veritas_sql)
@@ -1374,11 +1447,61 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
     def handle_VPM_data(self, vpm):
 
         # Handle the new data fetched from the database
+        self.last_vpm = vpm
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         print_string = '\n'
         for key, value in vpm.items():
             print_string += f"Telescope {key} - Elevation: {value['elevation_raw']}, Azimuth: {value['azimuth_raw']}\n"
         #logger.log(logging.INFO, print_string, extra=extra)
+
+    def printPointing(self):
+        """Dump the latest telescope pointings to the log as Az/Alt sexagesimal.
+
+        Formatted for pasting straight into Stellarium's search window, which
+        is why azimuth comes first and each pair sits on one line.
+        """
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+
+        if not self.last_vpm:
+            logger.log(logging.WARNING, "No telescope pointing yet -- start the VERITAS SQL database thread first.", extra=extra)
+            return
+
+        print_string = '\nTelescope pointing (Azimuth, Altitude)\n'
+        print_string += '______________________________________\n'
+
+        for telescope in ['t1', 't2', 't3', 't4']:
+            row = self.last_vpm.get(telescope)
+            if row is None:
+                print_string += f"{telescope.upper()}: no data\n"
+                continue
+
+            az = Angle(row['azimuth_raw']*u.rad).wrap_at(360*u.deg)
+            alt = Angle(row['elevation_raw']*u.rad)
+            print_string += f"{telescope.upper()}: {format_sexagesimal(az)}  {format_sexagesimal(alt)}\n"
+
+            # The positioner only writes status while it is moving, so a parked
+            # telescope's last row can be hours old. Say so -- pasting a stale
+            # pointing into Stellarium silently gives the wrong field.
+            age = self.pointing_age_minutes(row)
+            if age is None:
+                print_string += "    (row timestamp unreadable)\n"
+            elif abs(age) * 60.0 > MAX_POINTING_AGE_S:
+                print_string += f"    (STALE: row is {age:+.1f} min old)\n"
+
+        logger.log(logging.INFO, print_string, extra=extra)
+
+    def pointing_age_minutes(self, row):
+        """Age of a pointing row in minutes, or None if it cannot be read."""
+        stamp = row.get('timestamp')
+        if stamp is None:
+            return None
+
+        try:
+            obstime = Time(parse_vdb_timestamp(stamp), scale='utc')
+        except Exception:
+            return None
+
+        return (Time.now() - obstime).to_value(u.min)
 
     def handle_star_field_data(self, star_positions):
 
@@ -1401,18 +1524,16 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
         #print(self.star_field_labels)
         for i in range(4):
             if self.star_field[i] is not None:
+                # The name labels are child items of the scatter plot, so
+                # removing it takes them with it.
                 self.ws[i].removeItem(self.star_field[i])
-            if self.star_field_labels[i] is not None:
-                for text_item in self.star_field_labels[i]:
-                    self.ws[i].removeItem(text_item)
         self.star_field = [None, None, None, None]
         self.star_field_labels = [None, None, None, None]
         border_pen = pg.mkPen(color='k', width=1)  # Black border with width 1
         for i, star_positions in enumerate(array_star_positions):
             if len(star_positions) > 0:
-                ys, xs = list(zip(*star_positions))
-                #print("telescope", i)
-                #print("xys", xs, ys)
+                # star_field.stars_in_fov emits camera (x, y) pairs.
+                xs, ys = list(zip(*star_positions))
                 scatter_plot = pg.ScatterPlotItem(
                     x=xs,
                     y=ys,
@@ -1432,12 +1553,15 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 font = QtGui.QFont()
                 font.setPointSize(8)  # Set the font size to 12
                 font.setBold(True)
+                text_items = []
                 for j, point in enumerate(scatter_plot.points()):
                     x, y = point.pos()
                     text_item = pg.TextItem(text=array_star_labels[i][j], anchor=(0, 0.75))
                     text_item.setParentItem(scatter_plot)
                     text_item.setPos(x, y)
                     text_item.setFont(font)
+                    text_items.append(text_item)
+                self.star_field_labels[i] = text_items
             else:
                 self.star_field[i] = None
                 self.star_field_labels[i] = None
@@ -1448,9 +1572,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow):
                 print_string += f"\nTelescope {i+1} - Stars in FOV: {len(array_star_labels[i])}\n"
                 print_string += f"___________________________________\n"
                 for j, star in enumerate(array_star_labels[i]):
-                    offset = (f"{array_star_positions[i][j][0]:.3f}", f"{array_star_positions[i][j][1]:.3f}")
+                    x, y = array_star_positions[i][j]
                     print_string += f"Star {j+1}: {star}\n"
-                    print_string += f"Offset: {offset}\n"
+                    print_string += f"Camera x, y (deg): {x:+.3f}, {y:+.3f}\n"
                     print_string += f"-----------------------------------\n"
             logger.log(logging.INFO, print_string, extra=extra)
             self.star_field_request = False
