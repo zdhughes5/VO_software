@@ -171,7 +171,7 @@ from `channel` in the state file; `pixelIndex` is the corresponding dense range.
 The datagram the server sends to the GUI is **8000 bytes = 4 telescopes × 500
 float32**, little-endian, telescope *n* at byte offset `(n-1)*2000`
 (`GetTelescopeSendByteOffset`). The GUI slices it as `[:499] [500:999] [1000:1499]
-[1500:1999]` ([Realtime_GUI.py:1483](gui/Realtime_GUI.py#L1483)) — each slice drops its
+[1500:1999]` ([ui_camera.py:158](gui/ui_camera.py#L158)) — each slice drops its
 last pixel, so pixels 499/999/1499/1999 are never displayed.
 
 ## Server architecture (`server/cmd/server/server.go`)
@@ -190,15 +190,22 @@ carries the **entire state.json as a JSON string**, which becomes the server's
   fragments into the padded 560-array;
 - one `guiListener` goroutine → packs all four telescopes into the 8000-byte datagram.
 
-Run lifetime is driven by a single shared `*time.Timer`; `stopRunCmd` ends a run early
-by `Stop()` + `Reset(1ns)` and sets the `manualEnd` flag so the right status code is
-sent. `runReady` guards against overlapping runs. Status codes (1000–1003) go to the
-GUI on `guiStatusConnIP`.
+Each run has its own `time.Timer` and a buffered `stopRun` channel; `stopRunCmd` does a
+non-blocking send on it, so a stop that arrives before the run goroutine is waiting is
+still honoured. `runActive` (an `atomic.Bool`) guards against overlapping runs, and a
+start during a run is rejected **before** its state is unmarshalled, so it cannot
+overwrite `globalState` under the live run. Status codes go to the GUI on
+`guiStatusConnIP`: 1000 started, 1002 ended, 1003 ended manually, and 1001 **aborted**,
+sent when run setup fails (data dir missing, harvester address not on this host, bad
+state). Setup errors abort the run, not the process — they used to `log.Panic` inside
+the goroutine and kill the server. A malformed control datagram is logged and ignored.
 
 Deliberate sloppiness to be aware of before "fixing" it: the event builder does **not**
 match event numbers across harvesters, so it flushes and resets its partial event every
 32 iterations to bound staleness; `guiChannel` is drained rather than closed (closing it
-panicked the GUI listener); `stopListening` channels are closed, not signalled.
+panicked the GUI listener); `stopListening` channels are closed, not signalled. Every
+run goroutine selects on `stopListening`, and the run waits for its listeners before
+closing the `.bin` files, so nothing leaks between runs.
 
 `CreateRunFile` never overwrites — if `<run>_<telescope>.bin` exists it shunts to
 `<run>_<telescope>_<random hex>.bin` and logs a warning, so a duplicated run number
@@ -214,7 +221,7 @@ Check the path resolves before blaming the hardware.
 
 - `server/internal/server.json` — socket addresses, `dataSavePath`, `sendInterval`, and
   the command/status number tables. Loaded by **both** the server and the GUI
-  ([Realtime_GUI.py:401](gui/Realtime_GUI.py#L401)).
+  ([ui_server.py:515](gui/ui_server.py#L515)).
 - `server/internal/state.json` — the array: 4 telescopes × 8 harvesters, each with
   `missing`, `ip`, `channel`, `pixelIndex`. `missing: true` removes it from a run.
 - `server/internal/states/` — presets: `state_local.json`, `state_remote.json`,
@@ -229,9 +236,10 @@ Check the path resolves before blaming the hardware.
   the old crate machines need.
 
 Default ports: control 31250, GUI data 31255, heartbeat 31256, status 31257; harvesters
-listen on 3000x / 3126x per the state file. Harvester *control* commands are UDP
-broadcast to `255.255.255.255:5000` (`send_harvester_packet`), ignoring
-`harvesterControlConnIP` (currently `10.0.10.175:5000`) in the config.
+listen on 3000x / 3126x per the state file. Harvester *control* commands
+(`send_harvester_packet`) are UDP sent to `harvesterControlConnIP` from the config
+(currently `10.0.10.175:5000`); the broadcast `255.255.255.255:5000` variant is
+commented out in the code.
 
 ## GUI notes (`gui/`)
 
@@ -254,13 +262,30 @@ cannot regenerate it with the current toolchain. Leave all three alone.
 It owns the whole run: spawns `../server/bin/server` as a subprocess with
 `cwd=server/bin`, heartbeats it once a second, sends `startRunCmd` with the current
 state embedded, and writes run metadata rows into a **local PostgreSQL** `telescope_db`
-via `psycopg` (credentials are hardcoded at
-[ui_run_metadata.py:123](gui/ui_run_metadata.py#L123) and
-[:206](gui/ui_run_metadata.py#L206)). Separately it reads the **VERITAS MySQL** DB at
+via `psycopg` (credentials are hardcoded in `connect_to_vo_db` and
+`write_VO_db_params_to_db` in [ui_run_metadata.py](gui/ui_run_metadata.py)). The run
+number is **reserved with `nextval` at Start** and inserted explicitly as `run_id`, so the
+`.bin` names and the DB row always agree; the number shown before Start is only a
+preview. `vo_admin` has USAGE/SELECT on the sequence but not UPDATE, so `setval` is not
+available. Separately it reads the **VERITAS MySQL** DB at
 `romulus.ucsc.edu` read-only for telescope pointing; that query runs in a
 `multiprocessing.Process` (`db_worker_process.py`) rather than a thread, because the
 driver blocked the Qt event loop. Star overlays come from astropy / astroplan against
 `catalogs/asu2.dat`.
+
+**Start button gating** is a single function, `refresh_start_button` in
+[ui_run_metadata.py](gui/ui_run_metadata.py), and `start_blockers` lists its conditions:
+no run active, server heartbeat connected, state file loaded with no unsaved edits, a
+numeric VO run ID, a source ID (not `null`), and the FADC window set. Anything that
+changes one of those calls `refresh_start_button`. Start's tooltip names whatever is
+blocking. Start locks as soon as it is clicked. It is released on
+ended / ended_manually / aborted, after 5 s if the server never confirms the start, or on
+a heartbeat timeout. The Test tab's controls sit behind the **Enable debug controls**
+checkbox, and its *populate dt* force-enables Start until the checkbox is cleared.
+
+Exceptions in Qt slots do not abort the GUI: importing `pyqtgraph.Qt` replaces
+`sys.excepthook`. `install_exception_logger` (qt_logging) chains onto that hook so the
+traceback also reaches the log panel.
 
 FADC gate window changes are applied by SSHing to a crate and running `set_variance`
 there (`execute_binary_over_ssh(..., options='')`). `set_fadc_gate_array_window` reads

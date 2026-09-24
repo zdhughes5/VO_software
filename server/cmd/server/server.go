@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"math"
@@ -15,9 +14,10 @@ import (
 	"server/pkg/netutils"
 	"server/pkg/state"
 
-	//"sync"
 	//"os/exec"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -60,8 +60,10 @@ const (
 // Declare the global variable
 var ErrChannelAlreadyClosed = errors.New("channel already closed")
 var globalState state.SystemState
-var runReady bool = true
-var manualEnd bool = false
+
+// runActive is written by the control loop (on start) and by the run goroutine
+// (on exit), so it must be atomic.
+var runActive atomic.Bool
 var configFileName string = "../internal/server.json"
 var config state.Config
 
@@ -139,16 +141,14 @@ func main() {
 	defer udpStatusConn.Close()
 
 	ctrlBuf := make([]byte, 8000)
-	var receivedMap map[string]interface{}
 	var cmd int
 
 	stopForwarding := make(chan struct{})
-	//stopListening := make(chan struct{})
-	//listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
-	listeningTimer := time.NewTimer(time.Duration(1) * time.Nanosecond)
-	//log.Printf("Pre: listeningTimer address: %p", listeningTimer)
-	<-listeningTimer.C
-	//UNUSED(listeningTimer)
+
+	// One buffered stop channel per run. Buffered so that a stop arriving
+	// before the run goroutine reaches its select is still seen, rather than
+	// being lost the way a Stop()/Reset() on a shared timer could be.
+	var stopRun chan struct{}
 
 	for {
 
@@ -160,57 +160,66 @@ func main() {
 		if n > 20 {
 			log.Printf("Got %d bytes from UDP control packet from address %v \n", n, addr)
 		}
-		receivedJSON := ctrlBuf[:n]
-		err = json.Unmarshal(receivedJSON, &receivedMap)
+		// A fresh map each time: unmarshalling into a reused map merges, so
+		// keys from an earlier command would leak into this one.
+		receivedMap := map[string]interface{}{}
+		err = json.Unmarshal(ctrlBuf[:n], &receivedMap)
 		if err != nil {
-			fmt.Println("Error unmarshaling JSON:", err)
-			return
+			log.Printf("Ignoring control packet from %v, bad JSON: %v", addr, err)
+			continue
 		}
 
-		cmd = int(receivedMap["command"].(float64))
+		cmdFloat, ok := receivedMap["command"].(float64)
+		if !ok {
+			log.Printf("Ignoring control packet from %v, no numeric \"command\" field", addr)
+			continue
+		}
+		cmd = int(cmdFloat)
 
 		switch cmd {
 		case config.Commands.StartRunCmd:
-			//stopListening := make(chan struct{})
+			// Check before touching globalState: a start that arrives during a
+			// run must not replace the state the running goroutines read.
+			if runActive.Load() {
+				log.Println("Data run already running; ignoring start.")
+				break
+			}
 
-			runDuration := uint64(receivedMap["duration"].(float64))
-			runNumber := uint64(receivedMap["runNumber"].(float64))
-			runNumberString := strconv.FormatUint(runNumber, 10)
-			sendInterval := uint32(receivedMap["sendInterval"].(float64))
-			dataSaveDir := receivedMap["dataSaveDir"].(string)
+			runDuration, ok1 := receivedMap["duration"].(float64)
+			runNumber, ok2 := receivedMap["runNumber"].(float64)
+			sendInterval, ok3 := receivedMap["sendInterval"].(float64)
+			dataSaveDir, ok4 := receivedMap["dataSaveDir"].(string)
+			if !(ok1 && ok2 && ok3 && ok4) || runDuration < 0 || runNumber < 0 || sendInterval < 0 {
+				log.Println("Ignoring start: duration, runNumber, sendInterval and dataSaveDir must all be present and non-negative.")
+				_ = netutils.SendStatusCode(udpStatusConn, config.Status.Aborted)
+				break
+			}
+			runNumberString := strconv.FormatUint(uint64(runNumber), 10)
+
 			if stateContent, ok := receivedMap["state"].(string); ok {
-				err := json.Unmarshal([]byte(stateContent), &globalState)
-				if err != nil {
-					log.Printf("Error unmarshaling state.json content: %v", err)
-					return
+				var newState state.SystemState
+				if err := json.Unmarshal([]byte(stateContent), &newState); err != nil {
+					log.Printf("Ignoring start, bad state content: %v", err)
+					_ = netutils.SendStatusCode(udpStatusConn, config.Status.Aborted)
+					break
 				}
+				globalState.Lock()
+				globalState.Telescopes = newState.Telescopes
+				globalState.Unlock()
 				log.Printf("Successfully loaded state from state.json")
 			}
 
-			//log.Printf("Got start run command with run number %d and duration %d:", runNumber, runDuration)
-			//listeningTimer := time.NewTimer(time.Duration(runDuration) * time.Second)
-			//log.Printf("StartRunCmd: listeningTimer address: %p", listeningTimer)
-			if runReady {
-				runReady = false
-				log.Println("Starting data logging...")
-				go startHarvestersForRun(runDuration, runNumberString, sendInterval, dataSaveDir, udpStatusConn, listeningTimer)
-
-			} else {
-				log.Println("Data run already running.")
-			}
+			runActive.Store(true)
+			stopRun = make(chan struct{}, 1)
+			log.Println("Starting data logging...")
+			go startHarvestersForRun(uint64(runDuration), runNumberString, uint32(sendInterval), dataSaveDir, udpStatusConn, stopRun)
 
 		case config.Commands.StopRunCmd:
-			log.Println("StopRunCmd: Hola!")
-			//log.Printf("StopRunCmd: listeningTimer address: %p", listeningTimer)
-			if !runReady {
+			if runActive.Load() && stopRun != nil {
 				log.Println("StopRunCmd: Stopping data logging...")
-				manualEnd = true
-				if listeningTimer.Stop() {
-					listeningTimer.Reset(time.Duration(1) * time.Nanosecond)
-					log.Println("StopRunCmd: Sent code")
-				} else {
-					log.Println("StopRunCmd: Timer already stopped.")
-					resetManualEnd()
+				select {
+				case stopRun <- struct{}{}:
+				default: // A stop is already pending.
 				}
 			} else {
 				log.Println("StopRunCmd: No run to stop.")
@@ -231,14 +240,24 @@ func main() {
 			}*/
 
 		case config.Commands.StartDataForwardingCmd:
-			listenIP := receivedMap["listenIP"].(string)
-			forwardIP := receivedMap["forwardIP"].(string)
+			listenIP, ok1 := receivedMap["listenIP"].(string)
+			forwardIP, ok2 := receivedMap["forwardIP"].(string)
+			if !(ok1 && ok2) {
+				log.Println("Ignoring start data forwarding: listenIP and forwardIP are required.")
+				break
+			}
 			log.Printf("Got start data forwarding command with listen IP %s and forward IP %s:", listenIP, forwardIP)
 			go netutils.StartDataForwarding(listenIP, forwardIP, stopForwarding)
 
 		case config.Commands.StopDataForwardingCmd:
-			stopForwarding <- struct{}{}
-			log.Println("Stopping data forwarding...")
+			// Non-blocking: with no forwarder running, a plain send would
+			// block this loop forever and the heartbeat would stop.
+			select {
+			case stopForwarding <- struct{}{}:
+				log.Println("Stopping data forwarding...")
+			default:
+				log.Println("No data forwarding to stop.")
+			}
 
 		case config.Commands.ExitCmd:
 			log.Println("Exiting server...")
@@ -256,23 +275,40 @@ func main() {
 	}
 }
 
-func resetStart() {
-	runReady = true
+// harvesterSetup is everything one harvester listener needs, gathered before
+// any goroutine starts so that a setup failure can be undone cleanly.
+type harvesterSetup struct {
+	conn    *net.UDPConn
+	id      harvesterID
+	file    *os.File
+	builder chan eventBuilderData
 }
 
-func resetManualEnd() {
-	manualEnd = false
-}
+// startHarvestersForRun runs one data run from setup to teardown. Setup errors
+// used to log.Panic, which in a goroutine kills the whole server; now they
+// abort only this run and report status Aborted to the GUI.
+func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint32, dataSaveDir string, udpStatusConn *net.UDPConn, stopRun <-chan struct{}) {
 
-func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint32, dataSaveDir string, udpStatusConn *net.UDPConn, listeningTimer *time.Timer) {
+	defer runActive.Store(false)
 
-	defer resetStart()
-	defer resetManualEnd()
-
-	startListening := make(chan struct{})
-	stopListening := make(chan struct{})
-	//listeningTimer := time.NewTimer(time.Duration(duration) * time.Second)
-	listeningTimer.Reset(time.Duration(duration) * time.Second)
+	var conns []*net.UDPConn
+	var files []*os.File
+	closeConns := func() {
+		for _, c := range conns {
+			c.Close()
+		}
+	}
+	closeFiles := func() {
+		for _, f := range files {
+			f.Close()
+		}
+	}
+	abort := func(format string, args ...interface{}) {
+		log.Printf("Run %s aborted during setup: "+format, append([]interface{}{runNumber}, args...)...)
+		closeConns()
+		closeFiles()
+		_ = netutils.SendStatusCode(udpStatusConn, config.Status.Aborted)
+	}
 
 	telescopes := state.GetTelescopesPresentInt(&globalState)
 	eventBuilderChannels := make([]chan eventBuilderData, len(telescopes)) // One per telescope.
@@ -281,66 +317,108 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 	}
 	guiChannel := make(chan telescopeData, 10000)
 
-	// NEED TO CREATE CONNECTIONS HERE AND CLOSE THEM WHEN TIMER ENDS TO PREVENT HANGING.
-	// MAKE SHUNT FILENAME HERE AND PASS SO THEY ALL SHARE IT.
+	var harvesters []harvesterSetup
 	for i, telescope := range telescopes {
+		if telescope < 1 || telescope > 4 {
+			abort("telescope number %d is outside 1-4", telescope)
+			return
+		}
 		harvesterIPs, err := state.GetHarvestersPresentIPs(&globalState, telescope)
 		if err != nil {
-			log.Panic("Got error in getting harvester IP array:", err)
+			abort("getting harvester IPs: %v", err)
+			return
 		}
 		telescopeRunFile, runErr := ioutils.CreateRunFile(dataSaveDir, runNumber, telescope)
 		if runErr != nil {
-			log.Panic("Got error in creating run file:", runErr)
+			abort("creating run file: %v", runErr)
+			return
 		}
+		files = append(files, telescopeRunFile)
 
 		for _, harvesterIP := range harvesterIPs {
-			udpHarvesterConn, udpErr := netutils.EstablishUDPConnection(harvesterIP)
-			if udpErr != nil {
-				log.Panic("Got error in establishing control connection:", udpErr)
-			}
-			defer udpHarvesterConn.Close()
-
 			harvesterPosition, err := state.GetHarvesterLocalPositionFromIP(&globalState, harvesterIP)
 			if err != nil {
-				log.Panicf("Got error getting harvester position: %v", err)
+				abort("getting harvester position: %v", err)
+				return
 			}
-			thisHarvester := harvesterID{Harvester: harvesterPosition, Telescope: telescope}
-			go startHarvesterListener(udpHarvesterConn, thisHarvester, telescopeRunFile, startListening, stopListening, sendInterval, eventBuilderChannels[i])
-		}
-		if sendInterval > 0 {
-			go eventBuilder(eventBuilderChannels[i], guiChannel, startListening, stopListening, telescope)
+			// The event builder indexes an [8]bool with this and slices a
+			// [560] array with the channel range; bad values would panic there.
+			if harvesterPosition < 0 || harvesterPosition > 7 {
+				abort("harvester %s has localPosition %d, outside 0-7", harvesterIP, harvesterPosition)
+				return
+			}
+			channels, err := state.GetHarvesterChannel(&globalState, telescope, harvesterPosition)
+			if err != nil || channels[0] < 0 || channels[1] > 560 || channels[0] > channels[1] {
+				abort("harvester %s has bad channel range %v (%v)", harvesterIP, channels, err)
+				return
+			}
+
+			udpHarvesterConn, udpErr := netutils.EstablishUDPConnection(harvesterIP)
+			if udpErr != nil {
+				abort("listening on harvester %s: %v", harvesterIP, udpErr)
+				return
+			}
+			conns = append(conns, udpHarvesterConn)
+
+			harvesters = append(harvesters, harvesterSetup{
+				conn:    udpHarvesterConn,
+				id:      harvesterID{Harvester: harvesterPosition, Telescope: telescope},
+				file:    telescopeRunFile,
+				builder: eventBuilderChannels[i],
+			})
 		}
 	}
 
 	udpGUIConn, udpErr := netutils.EstablishUDPConnectionForWrite(config.GuiDataConnIP)
 	if udpErr != nil {
-		log.Panic("Got error in establishing GUI connection:", udpErr)
+		abort("establishing GUI connection: %v", udpErr)
+		return
 	}
-	defer udpGUIConn.Close()
-	go guiListener(udpGUIConn, guiChannel)
+	conns = append(conns, udpGUIConn)
+
+	// Setup succeeded; only now start goroutines.
+	startListening := make(chan struct{})
+	stopListening := make(chan struct{})
+	var listeners sync.WaitGroup
+	for _, h := range harvesters {
+		listeners.Add(1)
+		go func(h harvesterSetup) {
+			defer listeners.Done()
+			startHarvesterListener(h.conn, h.id, h.file, startListening, stopListening, sendInterval, h.builder)
+		}(h)
+	}
+	if sendInterval > 0 {
+		for i, telescope := range telescopes {
+			go eventBuilder(eventBuilderChannels[i], guiChannel, startListening, stopListening, telescope)
+		}
+	}
+	go guiListener(udpGUIConn, guiChannel, stopListening)
 	time.Sleep(1 * time.Millisecond)
 	close(startListening)
 
 	_ = netutils.SendStatusCode(udpStatusConn, config.Status.Started)
 
-	//log.Printf("startHarvestersForRun: listeningTimer address: %p", listeningTimer)
-	<-listeningTimer.C
+	runTimer := time.NewTimer(time.Duration(duration) * time.Second)
+	manualEnd := false
+	select {
+	case <-runTimer.C:
+	case <-stopRun:
+		runTimer.Stop()
+		manualEnd = true
+	}
+
 	close(stopListening)
+	// Closing the sockets unblocks listeners sitting in ReadFromUDP; wait for
+	// them before closing the files they write to.
+	closeConns()
+	listeners.Wait()
+	closeFiles()
+
 	if !manualEnd {
 		_ = netutils.SendStatusCode(udpStatusConn, config.Status.Ended)
 	} else {
 		_ = netutils.SendStatusCode(udpStatusConn, config.Status.Ended_manually)
 	}
-	/*err := safeClose(stopListening)
-	if err != nil {
-		log.Println("startHarvestersForRun: Channel already closed.")
-	} else {
-		netutils.SendStatusCode(udpStatusConn, config.Status.Ended)
-	}*/
-	//for _, ch := range eventBuilderChannels {
-	//	close(ch)
-	//}
-	// close(guiChannel) // Seems to be causing a panic. When I close the channel, the GUI listener panics.
 
 	log.Println("Data logging ended.")
 
@@ -348,99 +426,93 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 
 func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<- telescopeData, startListening <-chan struct{}, stopListening <-chan struct{}, telescope int) {
 
-	// I don't know why this happens: "panic: runtime error:
-	/*defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Recovered from panic: %v", r)
-		}
-	}()*/
-
 	//log.Printf("Starting event builder for telescope %d\n", telescope)
 	pixelValuesPadded := [560]float64{} // This has 60 empty channels spread throughout the array.
-	emptyBuf := [308]byte{}
-	eventBuilderData := eventBuilderData{Source: harvesterID{Harvester: 0, Telescope: 0}, Data: emptyBuf}
 	harvesterChannels := [2]int{0, 0}
-	//harvestersPresent := make([]bool, 8) // Need to make a function to get the number of actual harvesters present. And a harvesterNotPresent function.
 	harvestersPresent, presentErr := state.GetHarvestersMissingBool(&globalState, telescope)
 	if presentErr != nil {
-		log.Panic("Got error in getting missing harvesters:", presentErr)
+		log.Printf("Event builder for telescope %d not started: %v", telescope, presentErr)
+		return
 	}
 
 	// Wait for calling routine to say go.
 	j := 0
-	<-startListening
-	for i := 0; ; i++ {
+	i := 0
+	select {
+	case <-startListening:
+	case <-stopListening:
+		return
+	}
+	for {
+		// The receive sits in the select so that stopListening is seen even
+		// when no data is arriving; otherwise this goroutine leaked every run.
+		var eventBuilderData eventBuilderData
 		select {
 		case <-stopListening:
 			log.Printf("Stopping event builder for telescope %d.\nGot %d events on event builder\n", telescope, i)
-			UNUSED(j)
 			return
-		default:
-			j += 1
-			// Fix this hacky way of resetting the data.
-			// Since I do not check event numbers, it may be that
-			// I overwrite a harvester event with a new one from the same harvester.
-			// This induces an error in the GUI data. You could imagine a scenario where
-			// one harvester lags behind the others, resulting in stale data being displayed.
-			// Resetting the data every 32 events makes sure that it doesn't get too out of sync.
-			if j > 32 {
-				pixelValuesPadded = [560]float64{}
-				harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
-				j = 0
+		case eventBuilderData = <-eventBuilderChannel:
+		}
+		i++
+		j += 1
+		// Fix this hacky way of resetting the data.
+		// Since I do not check event numbers, it may be that
+		// I overwrite a harvester event with a new one from the same harvester.
+		// This induces an error in the GUI data. You could imagine a scenario where
+		// one harvester lags behind the others, resulting in stale data being displayed.
+		// Resetting the data every 32 events makes sure that it doesn't get too out of sync.
+		if j > 32 {
+			pixelValuesPadded = [560]float64{}
+			harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
+			j = 0
+		}
+		harvesterChannels, _ = state.GetHarvesterChannel(&globalState, eventBuilderData.Source.Telescope, eventBuilderData.Source.Harvester)
+		harvestersPresent[eventBuilderData.Source.Harvester] = true
+		copy(pixelValuesPadded[harvesterChannels[0]:harvesterChannels[1]], data_parsing.ConvertByteArrayToDecimals(eventBuilderData.Data[28:308]))
+		if state.AllHarvesters(harvestersPresent) {
+			pixelValues := data_parsing.ExtractRelevantPixels(pixelValuesPadded)
+			guiData := telescopeData{Telescope: eventBuilderData.Source.Telescope, Data: pixelValues}
+			select {
+			case guiChannel <- guiData:
+			case <-stopListening:
+				return
 			}
-			/*if i%1000 == 0 {
-				log.Printf("event builder: I haven't sent in %d events\n", i)
-			}*/
-			eventBuilderData = <-eventBuilderChannel
-			//log.Printf("Got event from harvester %d on telescope %d\n", eventBuilderData.Source.Harvester, eventBuilderData.Source.Telescope)
-			harvesterChannels, _ = state.GetHarvesterChannel(&globalState, eventBuilderData.Source.Telescope, eventBuilderData.Source.Harvester)
-			//log.Printf("Harvester channels: %v\n", harvesterChannels)
-			//log.Printf("harvestersPresent: %v\n", harvestersPresent)
-			harvestersPresent[eventBuilderData.Source.Harvester] = true
-			copy(pixelValuesPadded[harvesterChannels[0]:harvesterChannels[1]], data_parsing.ConvertByteArrayToDecimals(eventBuilderData.Data[28:308]))
-			if state.AllHarvesters(harvestersPresent) {
-				//fmt.Printf("loop is at %d\n", i)
-				pixelValues := data_parsing.ExtractRelevantPixels(pixelValuesPadded)
-				guiData := telescopeData{Telescope: eventBuilderData.Source.Telescope, Data: pixelValues}
-				guiChannel <- guiData
-				//fmt.Printf("Sent data to GUI\n")
-				pixelValuesPadded = [560]float64{}
-				harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
-				j = 0
-			}
-
+			pixelValuesPadded = [560]float64{}
+			harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
+			j = 0
 		}
 	}
 
 }
 
-func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData) {
+func guiListener(udpGUIConn *net.UDPConn, guiChannel <-chan telescopeData, stopListening <-chan struct{}) {
 
 	outGoingData := make([]byte, 8000)
 	udpGUIConn.Write(outGoingData)
-	telescopesPresent, presentErr := state.GetTelescopesMissingBool(&globalState)
-	if presentErr != nil {
-		log.Panic("Got error in getting missing harvesters:", presentErr)
-	}
+	telescopesPresent, _ := state.GetTelescopesMissingBool(&globalState)
 
-	for i := 0; ; i++ {
-		thisData := <-guiChannel
-		//fmt.Printf("Got data from telescope %d\n", thisData.Telescope)
+	for {
+		var thisData telescopeData
+		select {
+		case <-stopListening:
+			return
+		case thisData = <-guiChannel:
+		}
 		thisTelescope := thisData.Telescope
 		thisTelescopeOffset, offsetErr := data_parsing.GetTelescopeSendByteOffset(thisTelescope)
 		if offsetErr != nil {
-			log.Panic("Got error in getting telescope send byte offset:", offsetErr)
-			//log.Printf("Got error in getting telescope send byte offset: %v\n", offsetErr)
+			// Telescope numbers are checked in run setup, so this is not
+			// expected; drop the fragment rather than kill the server.
+			log.Printf("Dropping GUI data for telescope %d: %v", thisTelescope, offsetErr)
+			continue
 		}
 		offset := 0
 		for _, pixelValue := range thisData.Data {
-			//fmt.Printf("Pixel value: %f\n", pixelValue)
 			binary.LittleEndian.PutUint32(outGoingData[thisTelescopeOffset+offset:], math.Float32bits(float32(pixelValue)))
 			offset += 4
 		}
 		telescopesPresent[thisTelescope-1] = true
 		if state.AllTelescopes(telescopesPresent) {
-			//fmt.Printf("Sending this data to the GUI:\n")
 			_, _ = udpGUIConn.Write(outGoingData)
 			telescopesPresent, _ = state.GetTelescopesMissingBool(&globalState)
 			// Drain/flush/clear the channel
@@ -461,31 +533,30 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 	arrayPosition, _ := state.GetHarvesterArrayPositionFromIP(&globalState, thisIP)
 
 	// Wait for calling routine to say go.
-	<-startListening
-	if sendInterval > 0 {
-		for i := 0; ; i++ {
-			select {
-			case <-stopListening:
-				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
-				return
-			default:
-				n, _, _ := udpHarvesterConn.ReadFromUDP(buf)
-				_, _ = outputFile.Write(buf[:n])
-				if extractEventNumber(buf, true)%sendInterval == 0 { // Maybe change this to just i%sendInterval
-					copy(bufIn[:], buf[:308])
-					eventBuilderChannel <- eventBuilderData{Source: thisHarvester, Data: bufIn}
-				}
+	select {
+	case <-startListening:
+	case <-stopListening:
+		return
+	}
+	for i := 0; ; i++ {
+		select {
+		case <-stopListening:
+			log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
+			return
+		default:
+			n, _, err := udpHarvesterConn.ReadFromUDP(buf)
+			if err != nil {
+				// Normally the socket being closed at the end of the run;
+				// the select above then sees stopListening.
+				continue
 			}
-		}
-	} else {
-		for i := 0; ; i++ {
-			select {
-			case <-stopListening:
-				log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
-				return
-			default:
-				n, _, _ := udpHarvesterConn.ReadFromUDP(buf)
-				_, _ = outputFile.Write(buf[:n])
+			_, _ = outputFile.Write(buf[:n])
+			if sendInterval > 0 && extractEventNumber(buf, true)%sendInterval == 0 { // Maybe change this to just i%sendInterval
+				copy(bufIn[:], buf[:308])
+				select {
+				case eventBuilderChannel <- eventBuilderData{Source: thisHarvester, Data: bufIn}:
+				case <-stopListening:
+				}
 			}
 		}
 	}

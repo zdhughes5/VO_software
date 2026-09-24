@@ -4959,7 +4959,23 @@
        <attribute name="title">
         <string>Test</string>
        </attribute>
-       <widget class="QFrame" name="frame">
+       <widget class="QCheckBox" name="debug_mode_check">
+        <property name="geometry">
+         <rect>
+          <x>470</x>
+          <y>220</y>
+          <width>671</width>
+          <height>30</height>
+         </rect>
+        </property>
+        <property name="toolTip">
+         <string>Enables the controls below. They bypass the checks that keep Start locked; populate dt force-enables Start until this is unchecked.</string>
+        </property>
+        <property name="text">
+         <string>Enable debug controls (bypass Start checks)</string>
+        </property>
+       </widget>
+       <widget class="QFrame" name="debug_controls_frame">
         <property name="geometry">
          <rect>
           <x>470</x>

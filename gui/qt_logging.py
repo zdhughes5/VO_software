@@ -12,6 +12,8 @@ the basicConfig format string references %(qThreadName)s.
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import logging
+import sys
+import traceback
 
 fs = '[%(asctime)s %(levelname)s] %(message)s'
 formatter = logging.Formatter(fs)
@@ -59,3 +61,25 @@ class LogPanelMixin:
         color = self.COLORS.get(record.levelno, 'black')
         s = '<pre><font color="%s">%s</font></pre>' % (color, status)
         self.log_edit.appendHtml(s)
+
+
+def install_exception_logger():
+    """Also send unhandled exceptions to the log panel, not only the terminal.
+
+    Chains onto whatever hook is installed. Importing pyqtgraph.Qt already
+    replaced PyQt's default abort-on-exception with a hook that prints and
+    carries on, so a failing slot does not kill the GUI -- but its traceback
+    only reached a terminal the operator may not be watching.
+    """
+    previous_hook = sys.excepthook
+
+    def log_and_chain(exc_type, exc_value, exc_traceback):
+        try:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName()}
+            text = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            logger.log(logging.ERROR, f"Unhandled exception:\n{text}", extra=extra)
+        except Exception:
+            pass  # Never let the logging itself hide the original error.
+        previous_hook(exc_type, exc_value, exc_traceback)
+
+    sys.excepthook = log_and_chain

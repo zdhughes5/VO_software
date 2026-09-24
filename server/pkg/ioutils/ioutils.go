@@ -34,7 +34,8 @@ func generateRandomString(length int) (string, error) {
 // It takes the run number as a string and the telescope number as an integer.
 // The function returns a pointer to the created file and an error, if any.
 // If the file already exists, it appends a random string to the file name and creates a new file.
-// If there is an error creating the output file, it panics with the error message.
+// If the output file cannot be created, the error is returned (it used to panic,
+// which from the run goroutine took the whole server down).
 func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.File, error) {
 	telescopeString := strconv.Itoa(telescope)
 	outputFileName := dataSaveDir + runNumber + "_" + telescopeString + ".bin"
@@ -43,7 +44,7 @@ func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.Fil
 	if _, existsErr := os.Stat(outputFileName); os.IsNotExist(existsErr) {
 		outputFile, createErr := os.Create(outputFileName)
 		if createErr != nil {
-			log.Panicf("Got error creating output file: %v", createErr)
+			return nil, createErr
 		}
 		log.Println("Saving data to:", outputFileName)
 		return outputFile, nil
@@ -53,7 +54,7 @@ func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.Fil
 		log.Println("Shunting data to:", outputFileName)
 		outputFile, createErr := os.Create(outputFileName)
 		if createErr != nil {
-			log.Panicf("Got error creating output file: %v", createErr)
+			return nil, createErr
 		}
 		return outputFile, nil
 	}

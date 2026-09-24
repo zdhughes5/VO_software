@@ -33,6 +33,15 @@ class ServerControlMixin:
         self.s1.scene().sigMouseMoved.connect(self.onMouseMoved)
 
 
+        # Inputs to refresh_start_button that this panel owns.
+        self.run_active = False       # From the Start click until the run's end status.
+        self.run_confirmed = False    # Server has sent "started" for the current run.
+        self.server_connected = False # Heartbeats are coming back.
+        self.heartbeatRecvTimer = None
+        self.start_confirm_timer = QtCore.QTimer(self)
+        self.start_confirm_timer.setSingleShot(True)
+        self.start_confirm_timer.timeout.connect(self.handle_start_not_confirmed)
+
         self.config_file = '../server/internal/server.json'
         self.load_config_file()
         self.establish_connections()
@@ -114,6 +123,18 @@ class ServerControlMixin:
         return hex(timestamp)[2:]
 
     def request_listen(self):
+        """Send startRunCmd for the current VO DB parameters. Returns True if it was sent."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.state_data is None:
+            logger.log(logging.ERROR, "Cannot start: no state file loaded.", extra=extra)
+            return False
+        try:
+            int(self.VO_db_params['run_id'])
+            int(self.VO_db_params['duration'])
+        except ValueError:
+            logger.log(logging.ERROR, f"Cannot start: run ID {self.VO_db_params['run_id']!r} or duration {self.VO_db_params['duration']!r} is not a number.", extra=extra)
+            return False
+
         # Create data_map with parameters from VO_db_params and self.config_data
         data_map = {
             "command": int(self.config_data['commands']['startRunCmd']),
@@ -130,9 +151,9 @@ class ServerControlMixin:
 
         try:
             json_data = json.dumps(data_map)
-        except json.JSONEncodeError as err:
-            print(f"Error marshaling JSON: {err}")
-            return
+        except (TypeError, ValueError) as err:
+            logger.log(logging.ERROR, f"Error marshaling JSON: {err}", extra=extra)
+            return False
 
         #print(f"command is type {type(data_map['command'])}")
 
@@ -141,10 +162,11 @@ class ServerControlMixin:
 
         datagram = json_data.encode()
 
-        try:
-            self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
-        except Exception as err:
-            print(f"Error sending JSON over UDP: {err}")
+        nSent = self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
+        if nSent != len(datagram):
+            logger.log(logging.ERROR, f"Error sending start command over UDP: {self.heartbeatSocket.errorString()}", extra=extra)
+            return False
+        return True
 
     def execute_binary_over_ssh(self, hostname, username, binary_path, argument, options=''):
         """
@@ -206,6 +228,12 @@ class ServerControlMixin:
 
     def start_server(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        # poll() rather than a bare truth test: a server that died on its own
+        # leaves its Popen behind, and that used to block every restart.
+        if self.server_process is not None and self.server_process.poll() is not None:
+            logger.log(logging.WARNING, f"Previous server (PID {self.server_process.pid}) had exited with code {self.server_process.returncode}.", extra=extra)
+            self.stop_heartbeat_timers()
+            self.server_process = None
         if not self.server_process:
             try:
                 server_path = os.path.abspath("../server/bin/server")
@@ -218,7 +246,7 @@ class ServerControlMixin:
 
                 self.heartbeatRecvTimer = QtCore.QTimer()
                 self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
-                self.heartbeatRecvTimer.start(3000)  # Check for a heartbeat every 5 seconds
+                self.heartbeatRecvTimer.start(3000)  # Declare the server lost after 3 s without a heartbeat
 
                 logger.log(logging.INFO, f"Server started successfully with PID: {self.server_process.pid}", extra=extra)
             except Exception as e:
@@ -227,49 +255,56 @@ class ServerControlMixin:
             print_string = f"Server is already running at PID: {self.server_process.pid}"
             logger.log(logging.WARNING, print_string, extra=extra)
 
-    def check_server_is_stopped(self):
-        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        if self.server_process:
-            try:
-                os.kill(self.server_process.pid, 0)
-            except OSError or ProcessLookupError:
-                logger.log(logging.INFO, f"Server process with PID {self.server_process.pid} has been terminated (OSError).", extra=extra)
-                self.server_process = None
-                self.VO_server_status_line.setStyleSheet("background-color: yellow; color: black;")
-                self.VO_server_status_line.setText("Stopped")
-            except Exception as e:
-                logger.log(logging.ERROR, f"Failed to check server status: {e}", extra=extra)
-                os.kill(self.server_process.pid, signal.SIGTERM)
-            else:
-                logger.log(logging.WARNING, f"Server process with PID {self.server_process.pid} is still running.", extra=extra)
-                os.kill(self.server_process.pid, signal.SIGTERM)
+    def stop_heartbeat_timers(self):
+        for timer in (getattr(self, 'heartbeatSendTimer', None), self.heartbeatRecvTimer):
+            if timer is not None:
+                timer.stop()
+                try:
+                    timer.timeout.disconnect()
+                except TypeError:
+                    pass  # Nothing connected.
+        self.heartbeatSendTimer = None
+        self.heartbeatRecvTimer = None
 
     def stop_server(self):
+        """Ask the server to exit, and make sure it has, without blocking the GUI for long.
+
+        The old unbounded wait() froze the GUI -- and closing it -- whenever
+        the server did not exit on request.
+        """
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        if self.server_process:
-            try:
-                server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
-                server_control_port = int(server_control_port)
-
-                # Create the JSON object
-                stop_message = json.dumps({"command": 3})
-                datagram = stop_message.encode()
-
-                self.heartbeatSocket.writeDatagram(datagram, QHostAddress(server_control_ip), server_control_port)
-
-                self.heartbeatSendTimer.stop()
-                self.heartbeatRecvTimer.stop()
-                self.heartbeatSendTimer.timeout.disconnect(self.send_heartbeat)
-                self.heartbeatRecvTimer.timeout.disconnect(self.handle_heartbeat_timeout)
-
-                QtCore.QTimer.singleShot(1000, self.check_server_is_stopped)
-                self.server_process.wait()
-
-            except Exception as e:
-                logger.log(logging.ERROR, f"Failed to stop server: {e}", extra=extra)
-                QtWidgets.QMessageBox.critical(None, "Error", f"Failed to stop server: {e}")
-        else:
+        if not self.server_process:
             logger.log(logging.INFO, "Server is not running.", extra=extra)
+            return
+
+        try:
+            server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
+            exit_message = json.dumps({"command": int(self.config_data['commands']['exitCmd'])})
+            self.heartbeatSocket.writeDatagram(exit_message.encode(), QHostAddress(server_control_ip), int(server_control_port))
+        except Exception as e:
+            logger.log(logging.ERROR, f"Failed to send exit command to server: {e}", extra=extra)
+
+        self.stop_heartbeat_timers()
+
+        process = self.server_process
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            logger.log(logging.WARNING, f"Server PID {process.pid} ignored the exit command; terminating it.", extra=extra)
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                logger.log(logging.WARNING, f"Server PID {process.pid} ignored SIGTERM; killing it.", extra=extra)
+                process.kill()
+                process.wait()
+        logger.log(logging.INFO, f"Server process with PID {process.pid} has exited (code {process.returncode}).", extra=extra)
+
+        self.server_process = None
+        self.server_connected = False
+        self.VO_server_status_line.setStyleSheet("background-color: yellow; color: black;")
+        self.VO_server_status_line.setText("Stopped")
+        self.refresh_start_button()
 
     def bind_or_complain(self, socket, name, ip, port):
         """Bind a UDP socket, and say so loudly if the port is already taken.
@@ -322,23 +357,32 @@ class ServerControlMixin:
         return inverted_dictionary.get(value, None)
 
     def got_status(self):
+        # Read every pending datagram: a short run's "started" and "ended" can
+        # arrive together, and an unread one may not raise readyRead again.
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        datagram = self.statusSocket.receiveDatagram(8000)
-        status_code = struct.unpack('>I', datagram.data())[0]  # '>I' for big-endian unsigned int
-        #print(self.config_data["status"])
+        while self.statusSocket.hasPendingDatagrams():
+            datagram = self.statusSocket.receiveDatagram(8000)
+            try:
+                self.handle_status(bytes(datagram.data()))
+            except Exception as e:
+                logger.log(logging.ERROR, f"Error handling server status {bytes(datagram.data())!r}: {e!r}", extra=extra)
+        self.refresh_start_button()
+
+    def handle_status(self, data):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if len(data) != 4:
+            logger.log(logging.WARNING, f"Ignoring {len(data)}-byte datagram on the status port.", extra=extra)
+            return
+        status_code = struct.unpack('>I', data)[0]  # '>I' for big-endian unsigned int
         statuses = self.invert_dict(self.config_data["status"])
         status_key = self.get_key_from_value(statuses, status_code)
 
         logger.log(logging.INFO, f"Received status: {status_code}, corresponding to {status_key}", extra=extra)
-        
-        # Now you can compare status_code with the value in the JSON file
 
-        #for key, value in self.config_data["status"].items():
-        #    print(f"key: {key}, value: {value}, type: {type(value)}")
-            
-        #print('status_key:', status_key, type(status_key))
-        #print('self.config_data["status"]["started"]:', self.config_data["status"]["started"])
         if status_code == self.config_data["status"]["started"]:
+            self.start_confirm_timer.stop()
+            self.run_active = True
+            self.run_confirmed = True
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -348,24 +392,36 @@ class ServerControlMixin:
             self.VO_db_params_filled['data_end_time'] = False
             self.set_gui_components_enabled(False)
         elif status_code == self.config_data["status"]["aborted"]:
+            # Sent when the server could not set the run up (bad data dir,
+            # harvester address not on this host, ...). The server log says which.
+            logger.log(logging.ERROR, "The server aborted the run during setup; see server/log/server.log.", extra=extra)
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.set_gui_components_enabled(True)
-        elif status_code == self.config_data["status"]["ended"]:
+            self.end_run()
+        elif status_code in (self.config_data["status"]["ended"], self.config_data["status"]["ended_manually"]):
             self.VO_db_params_run_status_line.setText(status_key)
             self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.set_gui_components_enabled(True)
             self.write_VO_db_params_to_db()
-        elif status_code == self.config_data["status"]["ended_manually"]:
-            self.VO_db_params_run_status_line.setText(status_key)
-            self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            self.set_gui_components_enabled(True)
-            self.write_VO_db_params_to_db()
+            self.end_run()
         else:
             logger.log(logging.WARNING, f"Received unknown status: {status_code}", extra=extra)
+
+    def end_run(self):
+        """Release the GUI after a run, however it ended, and move to the next run ID."""
+        self.start_confirm_timer.stop()
+        self.run_active = False
+        self.run_confirmed = False
+        self.set_gui_components_enabled(True)
+        self.read_last_run_id()
+        self.refresh_start_button()
+
+    def handle_start_not_confirmed(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.run_active and not self.run_confirmed:
+            logger.log(logging.ERROR, "The server did not confirm the run start within 5 s; releasing the controls. Check the server status and server/log/server.log.", extra=extra)
+            self.end_run()
 
     def set_gui_components_enabled(self, enabled):
         if not enabled:
@@ -398,24 +454,40 @@ class ServerControlMixin:
         self.veritas_sql_ping_button.setEnabled(enabled)
         self.fadc_gate_array_window_set_button.setEnabled(enabled)
         self.fadc_gate_array_window_combo.setEnabled(enabled)
+        # A new state mid-run would change the masks written to the DB for the
+        # run in progress; stopping the server mid-run loses its DB row.
+        self.actionLoad_state_file.setEnabled(enabled)
+        self.VO_server_stop_button.setEnabled(enabled)
+        self.populate_dt.setEnabled(enabled)
+        self.wrtie_db.setEnabled(enabled)
 
     def got_heartbeat(self):
-        datagram = self.heartbeatSocket.receiveDatagram(8000)
-        # Process the received datagram
-        #print(f"Received heartbeat: {datagram.data().decode()}")
+        while self.heartbeatSocket.hasPendingDatagrams():
+            self.heartbeatSocket.receiveDatagram(8000)
         self.VO_server_status_line.setStyleSheet("background-color: green; color: white;")
         self.VO_server_status_line.setText("Connected")
-        self.reset_heartbeat_timer()
+        if self.heartbeatRecvTimer is not None:
+            self.reset_heartbeat_timer()
+        if not self.server_connected:
+            self.server_connected = True
+            self.refresh_start_button()
 
     def reset_heartbeat_timer(self):
         self.heartbeatRecvTimer.stop()
-        self.heartbeatRecvTimer.start(3000)  # Reset the timer with a 10-second interval
+        self.heartbeatRecvTimer.start(3000)  # Reset the 3-second timeout
 
     def handle_heartbeat_timeout(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         self.VO_server_status_line.setStyleSheet("background-color: red; color: white;")
         self.VO_server_status_line.setText("Disconnected")
         logger.log(logging.WARNING, "Heartbeat timeout. VO server disconnected.", extra=extra)
+        self.server_connected = False
+        if self.run_active:
+            # No end status will come from a dead server; without this the
+            # controls would stay locked for good.
+            logger.log(logging.ERROR, f"Lost the server during run {self.VO_db_params['run_id']}; releasing the controls. No DB row will be written unless the server recovers and reports the run's end.", extra=extra)
+            self.end_run()
+        self.refresh_start_button()
 
     def send_heartbeat(self):
         server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')
@@ -451,8 +523,34 @@ class ServerControlMixin:
 
     def startRun(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        logger.log(logging.INFO, 'Run started.', extra=extra)
-        self.request_listen()
+        if self.state_data is None:
+            logger.log(logging.ERROR, "Cannot start: no state file loaded.", extra=extra)
+            return
+
+        run_id = self.reserve_run_id()
+        if run_id is None:
+            try:
+                run_id = int(self.VO_db_params['run_id'])
+            except ValueError:
+                logger.log(logging.ERROR, "Cannot start: no run ID, and none could be reserved from the DB.", extra=extra)
+                return
+            logger.log(logging.WARNING, f"Using the previewed run ID {run_id}; check the DB row matches the .bin files.", extra=extra)
+        self.VO_db_params_runid_line.setText(str(run_id))
+        self.last_used_run_id = run_id
+
+        if not self.request_listen():
+            self.read_last_run_id()
+            return
+        logger.log(logging.INFO, f'Run {run_id} start requested.', extra=extra)
+
+        # Lock straight away rather than on the server's "started", so a
+        # second click cannot send a second start; release after 5 s if the
+        # server never confirms.
+        self.run_active = True
+        self.run_confirmed = False
+        self.start_confirm_timer.start(5000)
+        self.set_gui_components_enabled(False)
+        self.refresh_start_button()
 
     def stopRun(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }

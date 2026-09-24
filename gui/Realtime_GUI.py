@@ -34,7 +34,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from GUI import Ui_MainWindow
 import resources_rc
 
-from qt_logging import logger, LogPanelMixin
+from qt_logging import logger, LogPanelMixin, install_exception_logger
 from ui_camera import CameraDisplayMixin
 from ui_run_metadata import RunMetadataMixin
 from ui_server import ServerControlMixin
@@ -113,6 +113,7 @@ if __name__ == "__main__":
     QtCore.QThread.currentThread().setObjectName('MainThread')
     app = QtWidgets.QApplication(sys.argv)
     window = Window()
+    install_exception_logger()
     load_stylesheet(app, "Genetive.qss")
     window.show()
     sys.exit(app.exec())

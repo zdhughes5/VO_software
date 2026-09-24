@@ -114,7 +114,6 @@ class CameraDisplayMixin:
         self.w5.enableAutoRange(x=True)
         #self.w5.setRange(xRange=[0, 1000], padding=0)
         self.w5.setMouseEnabled(x=False, y=True)
-        self.firstFlip = False
 
 
         self.roi1.sigRegionChanged.connect(self.updateROI)
@@ -275,12 +274,15 @@ class CameraDisplayMixin:
         self.sample_average = self.data_display_sample_spin.value()
 
     def getDatagramAndQueue(self):
-        # Flush the socket
+        # Flush the socket, keeping only the latest datagram
+        datagram = None
         while self.listenSocket.hasPendingDatagrams():
             datagram = self.listenSocket.receiveDatagram(8000)
 
-        # Now receive the latest datagram
-        #datagram = self.listenSocket.receiveDatagram(8000)
+        # readyRead can fire with nothing to read, and anything that is not a
+        # full 4 x 500 float32 frame would break the slicing in update().
+        if datagram is None or len(datagram.data()) != 8000:
+            return
         pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
         self.pixelData = pixelData
         #print(self.pixelData)
