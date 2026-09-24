@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'star_options.ui'
+# Form implementation generated from reading ui file 'designer/star_options.ui'
 #
 # Created by: PyQt6 UI code generator 6.7.1
 #

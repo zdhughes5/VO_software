@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'GUI.ui'
+# Form implementation generated from reading ui file 'designer/GUI.ui'
 #
 # Created by: PyQt6 UI code generator 6.7.1
 #
@@ -641,7 +641,7 @@ class Ui_MainWindow(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 1890, 1006))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 1890, 852))
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
         self.gridLayout_24 = QtWidgets.QGridLayout(self.scrollAreaWidgetContents)
         self.gridLayout_24.setObjectName("gridLayout_24")
@@ -2317,7 +2317,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "VO Monitor"))
         self.obs_params_title_label.setText(_translate("MainWindow", "Observing Parameters"))
         self.obs_params_undo_button.setText(_translate("MainWindow", "Undo"))
         self.obs_params_set_button.setText(_translate("MainWindow", "Set"))

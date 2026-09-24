@@ -113,7 +113,7 @@ exist — they are not interchangeable:
 | `enviroment.yml` | conda env YAML, `name: optical9` | `conda env create -f enviroment.yml` |
 | `enviroment.txt` | conda `@EXPLICIT` URL list | exact rebuild of optical9 |
 | `conda_packages.txt` | conda name-only list | informational only |
-| `gui/requirements.txt` | pip, pinned | **stale and conflicting** — pins `astropy==4.2.1`, `numpy==1.20.1`, `PyQt5`. Ignore in favour of the root file. |
+| `gui/holder/requirements.txt` | pip, pinned | **stale and conflicting** — pins `astropy==4.2.1`, `numpy==1.20.1`, `PyQt5`. Moved out of `gui/` on 2026-09-23; use the root file. |
 
 `root_converter.py` needs PyROOT, which is not in `optical9`.
 
@@ -233,19 +233,30 @@ listen on 3000x / 3126x per the state file. Harvester *control* commands are UDP
 broadcast to `255.255.255.255:5000` (`send_harvester_packet`), ignoring
 `harvesterControlConnIP` (currently `10.0.10.175:5000`) in the config.
 
-## GUI notes (`gui/Realtime_GUI.py`, ~1634 lines)
+## GUI notes (`gui/`)
 
-The only real GUI source file. `gui/GUI.py` (the `Ui_MainWindow` it imports) and
-`gui/start2.py` are **pyuic6-generated** from `GUI.ui` / `designer/start2.ui`, and
-`resources_rc.py` from `resources.qrc` — edit the `.ui`/`.qrc` and regenerate, never the
-`.py`. (`gui/Makefile` is empty; regeneration is manual.)
+`gui/Realtime_GUI.py` is now just the `Window` shell (~120 lines); the behaviour lives in
+mixins, one module per panel — `qt_logging`, `star_display`, `veritas_db`, `ui_camera`,
+`ui_server`, `ui_run_metadata`, `ui_state_editor`, `ui_star_overlay`, `vestigial`. See
+[docs/2026-09-22-gui-module-split-plan.md](docs/2026-09-22-gui-module-split-plan.md).
+The mixins share `Window`'s namespace, so every `self` in them is the window.
+
+`gui/GUI.py` (the `Ui_MainWindow` it imports) and `gui/star_options_ui.py` are
+**pyuic6-generated** from `designer/GUI.ui` and `designer/star_options.ui` — edit the
+`.ui` and run `make` in `gui/`, never edit the `.py`. `make check` reports drift between
+a generated module and its source; use it, because `GUI.py` and `GUI.ui` silently
+diverged for a year after commit `80c6c5b` hand-edited the generated file.
+
+`resources_rc.py` is the exception: it was built by **PyQt5's** resource compiler, and
+PyQt6 has no `pyrcc6`, so `resources.qrc` and `images/` describe the committed blob but
+cannot regenerate it with the current toolchain. Leave all three alone.
 
 It owns the whole run: spawns `../server/bin/server` as a subprocess with
 `cwd=server/bin`, heartbeats it once a second, sends `startRunCmd` with the current
 state embedded, and writes run metadata rows into a **local PostgreSQL** `telescope_db`
 via `psycopg` (credentials are hardcoded at
-[Realtime_GUI.py:710](gui/Realtime_GUI.py#L710) and
-[:797](gui/Realtime_GUI.py#L797)). Separately it reads the **VERITAS MySQL** DB at
+[ui_run_metadata.py:123](gui/ui_run_metadata.py#L123) and
+[:206](gui/ui_run_metadata.py#L206)). Separately it reads the **VERITAS MySQL** DB at
 `romulus.ucsc.edu` read-only for telescope pointing; that query runs in a
 `multiprocessing.Process` (`db_worker_process.py`) rather than a thread, because the
 driver blocked the Qt event loop. Star overlays come from astropy / astroplan against
@@ -261,12 +272,18 @@ standalone SSH smoke test for the same path.
 `gui/optical_database.txt` is a saved `psql` dump of `tblrun_info` — useful as a
 reference for the run-metadata schema and for what real rows look like.
 
-Vestigial, not part of the running app: `gui/skyBox.py` (imports a nonexistent `skyUI`),
-`gui/scarp.py`, `gui/holder/`, `gui/GUI_old.ui`, `gui/Realtime_GUI.py.old`, the root
-`GUI.py` stub, and `gui/scripts/UDPsender_v7.py` (superseded by
-`scripts/UDPsender_v8.py`, which targets `10.0.10.175` instead of `192.168.0.0/24`).
-The `baseline` lineage deleted several of these; that cleanup has not been replayed
-here.
+**Unused files now live in `gui/holder/`** — as of 2026-09-23, everything not reachable
+from `Realtime_GUI.py` or `star_overlay_check.py` was moved there: `skyBox.py` (imports a
+nonexistent `skyUI`), `scarp.py`, `main.py`, `start2.py`, `designer/start2.ui`,
+`GUI_old.ui`, `GUI.xml`, `Realtime_GUI.py.old`, three unused `.qss` themes,
+`scripts/UDPsender_v7.py` (superseded by `scripts/UDPsender_v8.py`, which targets
+`10.0.10.175` instead of `192.168.0.0/24`), the stale `gui/requirements.txt`, and an
+empty `LICENSE`. `gui/holder/README.md` lists them with the evidence.
+
+Do not confuse `gui/holder/` with `gui/vestigial.py`: the latter is a **live, imported**
+module that parks unreachable `Window` methods, not a dead file.
+
+Still vestigial and outside that cleanup: the root `GUI.py` stub.
 
 ## Analysis scripts
 

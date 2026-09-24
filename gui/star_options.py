@@ -1,7 +1,7 @@
 """The Star Field Options window.
 
-Logic only; the widget layout lives in ``star_options.ui`` and is compiled to
-``star_options_ui.py`` with pyuic6. Edit the .ui and regenerate -- never the
+Logic only; the widget layout lives in ``designer/star_options.ui`` and is
+compiled to ``star_options_ui.py`` by ``make``. Edit the .ui and regenerate -- never the
 generated module. This mirrors how ``Realtime_GUI.py`` wraps ``GUI.py``.
 
 The window is non-modal so the camera panels update while thresholds are

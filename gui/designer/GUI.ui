@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>VO Monitor</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
@@ -1440,7 +1440,7 @@
              <x>0</x>
              <y>0</y>
              <width>1890</width>
-             <height>1006</height>
+             <height>852</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_24">
