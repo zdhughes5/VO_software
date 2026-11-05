@@ -77,6 +77,7 @@ cd server/bin && ./server
 # Drive the server without the GUI
 cd server/bin && ./send_command listen <duration_s> <runID> <sendInterval> <dataSaveDir>
 cd server/bin && ./send_command generate <maxPackets> <packetInterval_us>   # fake harvesters
+cd server/bin && ./send_command --state <state.json> generate ...           # any state file
 cd server/bin && ./send_command scan <maxPackets> <start_us> <stop_us> <step_us> <dataSaveDir>
 
 # GUI — CWD MUST be gui/: it loads Genetive.qss, catalogs/asu2.dat,
@@ -211,11 +212,13 @@ closing the `.bin` files, so nothing leaks between runs.
 `<run>_<telescope>_<random hex>.bin` and logs a warning, so a duplicated run number
 produces silently renamed files rather than an error.
 
-`send_command` loads its state file from a hardcoded `configFile` path relative to
-`server/bin/`, and **discards the load error** (`pGlobalState, _ := ...`). A wrong path
-therefore yields an empty state and a run with zero telescopes rather than a failure —
-which is exactly how a doubled `states/states/` path in that constant went unnoticed.
-Check the path resolves before blaming the hardware.
+`send_command` takes its state file from `--state`, which defaults to the
+`configFile` constant (`../internal/states/state_veritas_2025.json`, relative to
+`server/bin/`). A file that fails to load is now an error with exit code 1. The error used to
+be discarded, which is how a doubled `states/states/` path in that constant once went
+unnoticed. `generate` sends exactly `maxPackets` packets per present harvester. They
+carry little-endian event numbers 1..N and random variance words, with zeroed
+timestamps and registers.
 
 ## Config and state files
 
@@ -248,6 +251,10 @@ mixins, one module per panel — `qt_logging`, `star_display`, `veritas_db`, `ui
 `ui_server`, `ui_run_metadata`, `ui_state_editor`, `ui_star_overlay`, `vestigial`. See
 [docs/2026-09-22-gui-module-split-plan.md](docs/2026-09-22-gui-module-split-plan.md).
 The mixins share `Window`'s namespace, so every `self` in them is the window.
+Because `QMainWindow` comes first in `Window`'s bases, **a mixin method named like a Qt
+method is silently shadowed**. The camera's `update()` was hidden by `QWidget.update()`
+after the split, so frames arrived and nothing recoloured. It is now
+`update_camera_display`. Don't give a mixin method a name that `QMainWindow` already has.
 
 `gui/GUI.py` (the `Ui_MainWindow` it imports) and `gui/star_options_ui.py` are
 **pyuic6-generated** from `designer/GUI.ui` and `designer/star_options.ui` — edit the
@@ -282,6 +289,11 @@ blocking. Start locks as soon as it is clicked. It is released on
 ended / ended_manually / aborted, after 5 s if the server never confirms the start, or on
 a heartbeat timeout. The Test tab's controls sit behind the **Enable debug controls**
 checkbox, and its *populate dt* force-enables Start until the checkbox is cleared.
+The same frame holds a **send_command generate** panel
+([ui_send_command.py](gui/ui_send_command.py)). It writes the loaded (Set) state to a
+temp file and runs `send_command --state <tmp> generate N µs` as a `QProcess`, sending
+the output to the log panel. Start a run normally first, and the dummy packets are
+recorded into its `.bin` files.
 
 Exceptions in Qt slots do not abort the GUI: importing `pyqtgraph.Qt` replaces
 `sys.excepthook`. `install_exception_logger` (qt_logging) chains onto that hook so the

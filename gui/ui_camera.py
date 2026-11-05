@@ -80,9 +80,9 @@ class CameraDisplayMixin:
         self.pixelTimeSeriesDataCurve3 = pg.PlotCurveItem(self.pixelTimeSeriesData3, pen=(0,255,0), antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve4 = pg.PlotCurveItem(self.pixelTimeSeriesData4, pen=(0,0,255), antialias=False, skipFiniteCheck=True)
         self.w5.addItem(self.pixelTimeSeriesDataCurve1)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve2)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve3)
-        #self.w5.addItem(self.pixelTimeSeriesDataCurve4)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve2)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve3)
+        self.w5.addItem(self.pixelTimeSeriesDataCurve4)
 
         thick_pen = pg.mkPen((255, 0, 0), width=3)
         self.roi1 = pg.CircleROI([-0.25, -0.25], [0.5, 0.5], pen=thick_pen, handlePen=thick_pen)
@@ -105,13 +105,13 @@ class CameraDisplayMixin:
         self.fps = None
         self.lastTime = perf_counter()
         
-        #self.update()
+        #self.update_camera_display()
         self.w1.disableAutoRange()
         self.w2.disableAutoRange()
         self.w3.disableAutoRange()
         self.w4.disableAutoRange()
-        self.w5.disableAutoRange()
-        self.w5.enableAutoRange(x=True)
+        #self.w5.disableAutoRange()
+        #self.w5.enableAutoRange(x=True)
         #self.w5.setRange(xRange=[0, 1000], padding=0)
         self.w5.setMouseEnabled(x=False, y=True)
 
@@ -149,7 +149,10 @@ class CameraDisplayMixin:
     #, 'pen': {'color': 'w', 'width': 0.1}
         return w, s, spots, xs, ys, labels
 
-    def update(self):
+    def update_camera_display(self):
+        # Not called update(): Window inherits QMainWindow first, so
+        # QWidget.update() -- Qt's repaint request -- would shadow a mixin
+        # method of that name, and the camera would silently never recolour.
         #self.pixelData = self.listenOutQueue.get()
        # print(self.pixelData)
         
@@ -286,4 +289,4 @@ class CameraDisplayMixin:
         pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
         self.pixelData = pixelData
         #print(self.pixelData)
-        self.update()
+        self.update_camera_display()

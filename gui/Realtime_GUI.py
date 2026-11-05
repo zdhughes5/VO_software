@@ -20,6 +20,7 @@ Created on Tue Oct 11 20:54:47 2022
 #   ui_run_metadata   observing parameters and the VO run-metadata row
 #   ui_state_editor   state.json editing
 #   ui_star_overlay   star overlay and the SQL thread that feeds it
+#   ui_send_command   Test-tab send_command generate (dummy packets)
 #   vestigial         unreachable code, parked
 #
 # The mixins share Window's namespace: every `self` inside them is this
@@ -37,6 +38,7 @@ import resources_rc
 from qt_logging import logger, LogPanelMixin, install_exception_logger
 from ui_camera import CameraDisplayMixin
 from ui_run_metadata import RunMetadataMixin
+from ui_send_command import SendCommandMixin
 from ui_server import ServerControlMixin
 from ui_star_overlay import StarOverlayMixin
 from ui_state_editor import StateEditorMixin
@@ -45,7 +47,8 @@ from ui_state_editor import StateEditorMixin
 
 class Window(QtWidgets.QMainWindow, Ui_MainWindow,
              LogPanelMixin, CameraDisplayMixin, ServerControlMixin,
-             RunMetadataMixin, StateEditorMixin, StarOverlayMixin):
+             RunMetadataMixin, StateEditorMixin, StarOverlayMixin,
+             SendCommandMixin):
 
     startWorkerSignal = QtCore.pyqtSignal()
     stopWorkerSignal = QtCore.pyqtSignal()
@@ -95,11 +98,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow,
         self._setup_vo_db_params()
         self._setup_fadc_and_run_buttons()
         self._setup_harvester_controls()
+        self._setup_send_command()
 
     def closeEvent(self, event):
         if self.star_options_dialog is not None:
             self.star_options_dialog.close()
         self.stopWorker()
+        self.send_command_kill()
         self.stop_server() # Make a purpose-built function to stop the server
         event.accept()
 

@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Change these to test things.
+// Change these to test things. configFile is only the default for --state.
 var (
 	controlConnIP string = "127.0.0.1:31250"
 	configFile    string = "../internal/states/state_veritas_2025.json"
@@ -34,9 +34,32 @@ const (
 
 func main() {
 
-	pGlobalState, _ := state.LoadStateFromFile(configFile)
+	var pGlobalState *state.SystemState
 
-	var rootCmd = &cobra.Command{Use: "send_command"}
+	var rootCmd = &cobra.Command{
+		Use: "send_command",
+		// Load the state up front and fail loudly. The error used to be
+		// discarded, so a wrong path gave an empty state and a "run" that
+		// sent nothing.
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			pGlobalState, err = state.LoadStateFromFile(configFile)
+			if err != nil {
+				return fmt.Errorf("loading state file %s: %w", configFile, err)
+			}
+			present := 0
+			for _, telescope := range state.GetTelescopesPresentInt(pGlobalState) {
+				harvesters, _ := state.GetHarvestersPresentInt(pGlobalState, telescope)
+				present += len(harvesters)
+			}
+			if present == 0 {
+				fmt.Printf("Warning: state file %s has no present harvesters; nothing will be sent.\n", configFile)
+			}
+			return nil
+		},
+		SilenceUsage: true,
+	}
+	rootCmd.PersistentFlags().StringVar(&configFile, "state", configFile, "state file giving the harvester addresses (relative paths are from the working directory)")
 
 	var cmd1 = &cobra.Command{
 		Use:   "generate [maxPackets] [packetInterval]",
@@ -51,6 +74,10 @@ func main() {
 			packetInterval, err := strconv.Atoi(args[1])
 			if err != nil {
 				fmt.Println("Error parsing option2Cmd1:", err)
+				os.Exit(1)
+			}
+			if maxPackets < 1 || packetInterval < 1 {
+				fmt.Println("maxPackets and packetInterval must both be at least 1.")
 				os.Exit(1)
 			}
 
@@ -130,7 +157,9 @@ func main() {
 	rootCmd.AddCommand(cmd1)
 	rootCmd.AddCommand(cmd2)
 	rootCmd.AddCommand(cmd3)
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 
 }
 
@@ -193,7 +222,11 @@ func sendTestDataToHarvesters(pGlobalState *state.SystemState, maxPackets int, p
 
 func sendDataToIP(ip string, harvester int, maxPackets int, packetInterval int) {
 
-	harvesterUDPConn, _ := netutils.EstablishUDPConnectionForWrite(ip)
+	harvesterUDPConn, err := netutils.EstablishUDPConnectionForWrite(ip)
+	if err != nil {
+		fmt.Printf("Cannot send to harvester %d at %s: %v\n", harvester, ip, err)
+		return
+	}
 	defer harvesterUDPConn.Close()
 
 	j := 1
@@ -206,7 +239,7 @@ func sendDataToIP(ip string, harvester int, maxPackets int, packetInterval int) 
 
 	startTime := time.Now()
 	for range ticker.C {
-		if j >= maxPackets {
+		if j > maxPackets {
 			break
 		}
 		binary.LittleEndian.PutUint32(iterationBytes, uint32(j))

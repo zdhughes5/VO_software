@@ -4981,7 +4981,7 @@
           <x>470</x>
           <y>260</y>
           <width>671</width>
-          <height>481</height>
+          <height>700</height>
          </rect>
         </property>
         <property name="frameShape">
@@ -5024,6 +5024,91 @@
            <property name="text">
             <string>Dump postgres dict</string>
            </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="sc_group">
+           <property name="title">
+            <string>send_command generate (dummy packets)</string>
+           </property>
+           <layout class="QGridLayout" name="sc_grid_layout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="sc_max_packets_label">
+             <property name="text">
+              <string>Packets per harvester</string>
+             </property>
+            </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QSpinBox" name="sc_max_packets_spin">
+             <property name="toolTip">
+              <string>Number of 308-byte packets sent to each present harvester in the loaded state.</string>
+             </property>
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>1000000000</number>
+             </property>
+             <property name="value">
+              <number>10000</number>
+             </property>
+            </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="sc_interval_us_label">
+             <property name="text">
+              <string>Interval between packets</string>
+             </property>
+            </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QSpinBox" name="sc_interval_us_spin">
+             <property name="toolTip">
+              <string>Time between packets to each harvester. 1000 µs is about 1 kHz per harvester.</string>
+             </property>
+             <property name="suffix">
+              <string> µs</string>
+             </property>
+             <property name="minimum">
+              <number>1</number>
+             </property>
+             <property name="maximum">
+              <number>10000000</number>
+             </property>
+             <property name="value">
+              <number>1000</number>
+             </property>
+            </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QPushButton" name="sc_generate_button">
+             <property name="toolTip">
+              <string>Run server/bin/send_command generate against the harvester addresses of the loaded (Set) state.</string>
+             </property>
+             <property name="text">
+              <string>Generate</string>
+             </property>
+            </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QPushButton" name="sc_kill_button">
+             <property name="toolTip">
+              <string>Stop a running send_command.</string>
+             </property>
+             <property name="text">
+              <string>Kill</string>
+             </property>
+            </widget>
+            </item>
+            <item row="3" column="0" colspan="2">
+             <widget class="QLabel" name="sc_status_label">
+             <property name="text">
+              <string>idle</string>
+             </property>
+            </widget>
+            </item>
+           </layout>
           </widget>
          </item>
         </layout>
