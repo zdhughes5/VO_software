@@ -23,17 +23,30 @@ type Commands struct {
 	StopDataForwardingCmd  int `json:"stopDataForwardingCmd"`
 	HearbeatCmd            int `json:"hearbeatCmd"`
 	StopRunCmd             int `json:"stopRunCmd"`
+	HarvesterCmd           int `json:"harvesterCmd"`
 }
 
+// Run file layouts, chosen by the "runFileLayout" key in server.json.
+const (
+	// One <run>_<tel>.bin per telescope, every harvester of that telescope
+	// interleaved into it. Only separable offline if the payload identifies
+	// the board. This is the layout used up to 2026-11.
+	RunFilePerTelescope = "perTelescope"
+	// One <run>_<tel>_h<localPosition>.bin per harvester.
+	RunFilePerHarvester = "perHarvester"
+)
+
 type Config struct {
-	ServerControlConnIP string   `json:"serverControlConnIP"`
-	GuiDataConnIP       string   `json:"guiDataConnIP"`
-	GuiHeartbeatConnIP  string   `json:"guiHeartbeatConnIP"`
-	GuiStatusConnIP     string   `json:"guiStatusConnIP"`
-	DataSavePath        string   `json:"dataSavePath"`
-	SendInterval        int      `json:"sendInterval"`
-	Commands            Commands `json:"commands"`
-	Status              Status   `json:"status"`
+	ServerControlConnIP    string   `json:"serverControlConnIP"`
+	GuiDataConnIP          string   `json:"guiDataConnIP"`
+	GuiHeartbeatConnIP     string   `json:"guiHeartbeatConnIP"`
+	GuiStatusConnIP        string   `json:"guiStatusConnIP"`
+	HarvesterControlConnIP string   `json:"harvesterControlConnIP"`
+	DataSavePath           string   `json:"dataSavePath"`
+	SendInterval           int      `json:"sendInterval"`
+	RunFileLayout          string   `json:"runFileLayout"`
+	Commands               Commands `json:"commands"`
+	Status                 Status   `json:"status"`
 }
 
 func LoadConfig(filename string) (*Config, error) {

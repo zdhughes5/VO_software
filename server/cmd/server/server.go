@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"io"
 	"log"
 	"math"
@@ -64,8 +66,13 @@ var globalState state.SystemState
 // runActive is written by the control loop (on start) and by the run goroutine
 // (on exit), so it must be atomic.
 var runActive atomic.Bool
-var configFileName string = "../internal/server.json"
 var config state.Config
+
+// harvesterSocketReadBuffer is requested on every harvester socket. With
+// several boards per telescope the default (~200 kB) leaves little slack for a
+// disk stall. The kernel silently caps it at net.core.rmem_max, so that sysctl
+// must be raised on the DAQ machine too (deploy/ONSITE_CHECKLIST.md).
+const harvesterSocketReadBuffer = 8 << 20
 
 func safeClose(ch chan struct{}) (thing error) {
 	log.Println("Closing channel")
@@ -93,8 +100,17 @@ func main() {
 	}
 	fmt.Println(pwd)*/
 
+	// Paths are relative to the working directory, which must be server/bin.
+	configFileName := flag.String("config", "../internal/server.json", "server config file")
+	flag.Parse()
+
 	/////////////////// Start Logger //////////
 
+	// server/log is not in git (*.log is ignored), so a fresh clone has no
+	// such directory and opening the log used to panic.
+	if err := os.MkdirAll("../log", 0755); err != nil {
+		panic(err)
+	}
 	logFile, err := os.OpenFile("../log/server.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
@@ -108,12 +124,21 @@ func main() {
 
 	//////////////// Load Config //////////////
 
-	pConfig, err := state.LoadConfig(configFileName)
+	pConfig, err := state.LoadConfig(*configFileName)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load config %s: %v", *configFileName, err)
 	}
 	config = *pConfig
-	//log.Printf("Loaded config: %+v", config)
+	switch config.RunFileLayout {
+	case state.RunFilePerTelescope, state.RunFilePerHarvester:
+	default:
+		log.Printf("WARNING: runFileLayout %q is not %q or %q; using %q.", config.RunFileLayout, state.RunFilePerHarvester, state.RunFilePerTelescope, state.RunFilePerTelescope)
+		config.RunFileLayout = state.RunFilePerTelescope
+	}
+	// Printed so that a two-machine setup can be checked from the log alone.
+	log.Printf("Config %s: control (listen) %s; GUI data -> %s, heartbeat -> %s, status -> %s; harvester control -> %s; run files %s",
+		*configFileName, config.ServerControlConnIP, config.GuiDataConnIP, config.GuiHeartbeatConnIP,
+		config.GuiStatusConnIP, config.HarvesterControlConnIP, config.RunFileLayout)
 
 	///////////////////////////////////////////
 
@@ -140,7 +165,24 @@ func main() {
 	}
 	defer udpStatusConn.Close()
 
-	ctrlBuf := make([]byte, 8000)
+	// For relaying harvester control commands (harvesterCmd) when the GUI
+	// machine cannot reach the harvester network itself. Optional: a missing
+	// or bad address only disables the relay.
+	var udpHarvesterControlConn *net.UDPConn
+	if config.HarvesterControlConnIP != "" {
+		udpHarvesterControlConn, err = netutils.EstablishUDPConnectionForWrite(config.HarvesterControlConnIP)
+		if err != nil {
+			log.Printf("Harvester command relay disabled, cannot dial %s: %v", config.HarvesterControlConnIP, err)
+			udpHarvesterControlConn = nil
+		} else {
+			defer udpHarvesterControlConn.Close()
+		}
+	}
+
+	// The UDP maximum. startRunCmd carries the whole state as a string
+	// (~5 kB from the GUI); with the old 8000-byte buffer a pretty-printed
+	// state sent by send_command was silently truncated into bad JSON.
+	ctrlBuf := make([]byte, 65536)
 	var cmd int
 
 	stopForwarding := make(chan struct{})
@@ -259,6 +301,35 @@ func main() {
 				log.Println("No data forwarding to stop.")
 			}
 
+		case config.Commands.HarvesterCmd:
+			// Relay: the GUI hex-encodes the exact bytes it would otherwise
+			// have sent to harvesterControlConnIP itself.
+			if config.Commands.HarvesterCmd == 0 {
+				log.Println("Ignoring command 0 (\"nothing\").")
+				break
+			}
+			payloadHex, ok := receivedMap["payload"].(string)
+			if !ok {
+				log.Printf("Ignoring harvester command from %v: no \"payload\" string", addr)
+				break
+			}
+			payload, err := hex.DecodeString(payloadHex)
+			if err != nil || len(payload) == 0 {
+				log.Printf("Ignoring harvester command from %v: bad hex payload %q (%v)", addr, payloadHex, err)
+				break
+			}
+			if udpHarvesterControlConn == nil {
+				log.Printf("Ignoring harvester command: relay disabled (harvesterControlConnIP %q)", config.HarvesterControlConnIP)
+				break
+			}
+			if _, err := udpHarvesterControlConn.Write(payload); err != nil {
+				log.Printf("Relaying harvester command to %s failed: %v", config.HarvesterControlConnIP, err)
+				break
+			}
+			if receivedMap["log"] == true {
+				log.Printf("Relayed %d-byte harvester command %s to %s", len(payload), payloadHex, config.HarvesterControlConnIP)
+			}
+
 		case config.Commands.ExitCmd:
 			log.Println("Exiting server...")
 			return
@@ -328,12 +399,19 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 			abort("getting harvester IPs: %v", err)
 			return
 		}
-		telescopeRunFile, runErr := ioutils.CreateRunFile(dataSaveDir, runNumber, telescope)
-		if runErr != nil {
-			abort("creating run file: %v", runErr)
-			return
+		// runFileLayout perTelescope: one file shared by all of this
+		// telescope's harvesters (the layout before 2026-11). perHarvester:
+		// one file per harvester, opened in the loop below.
+		var telescopeRunFile *os.File
+		if config.RunFileLayout == state.RunFilePerTelescope {
+			var runErr error
+			telescopeRunFile, runErr = ioutils.CreateRunFile(dataSaveDir, runNumber, telescope)
+			if runErr != nil {
+				abort("creating run file: %v", runErr)
+				return
+			}
+			files = append(files, telescopeRunFile)
 		}
-		files = append(files, telescopeRunFile)
 
 		for _, harvesterIP := range harvesterIPs {
 			harvesterPosition, err := state.GetHarvesterLocalPositionFromIP(&globalState, harvesterIP)
@@ -359,11 +437,25 @@ func startHarvestersForRun(duration uint64, runNumber string, sendInterval uint3
 				return
 			}
 			conns = append(conns, udpHarvesterConn)
+			if err := udpHarvesterConn.SetReadBuffer(harvesterSocketReadBuffer); err != nil {
+				log.Printf("Could not set a %d-byte receive buffer on harvester %s: %v", harvesterSocketReadBuffer, harvesterIP, err)
+			}
+
+			runFile := telescopeRunFile
+			if config.RunFileLayout == state.RunFilePerHarvester {
+				harvesterRunFile, runErr := ioutils.CreateHarvesterRunFile(dataSaveDir, runNumber, telescope, harvesterPosition)
+				if runErr != nil {
+					abort("creating run file for harvester %s: %v", harvesterIP, runErr)
+					return
+				}
+				files = append(files, harvesterRunFile)
+				runFile = harvesterRunFile
+			}
 
 			harvesters = append(harvesters, harvesterSetup{
 				conn:    udpHarvesterConn,
 				id:      harvesterID{Harvester: harvesterPosition, Telescope: telescope},
-				file:    telescopeRunFile,
+				file:    runFile,
 				builder: eventBuilderChannels[i],
 			})
 		}
@@ -438,6 +530,8 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 	// Wait for calling routine to say go.
 	j := 0
 	i := 0
+	partialFlushes := 0
+	contributed := false // A fragment has landed in pixelValuesPadded since the last flush.
 	select {
 	case <-startListening:
 	case <-stopListening:
@@ -449,7 +543,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 		var eventBuilderData eventBuilderData
 		select {
 		case <-stopListening:
-			log.Printf("Stopping event builder for telescope %d.\nGot %d events on event builder\n", telescope, i)
+			log.Printf("Stopping event builder for telescope %d.\nGot %d events on event builder (%d partial frames sent)\n", telescope, i, partialFlushes)
 			return
 		case eventBuilderData = <-eventBuilderChannel:
 		}
@@ -461,14 +555,30 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 		// This induces an error in the GUI data. You could imagine a scenario where
 		// one harvester lags behind the others, resulting in stale data being displayed.
 		// Resetting the data every 32 events makes sure that it doesn't get too out of sync.
+		//
+		// Before resetting, send what has arrived. A board that sends nothing
+		// (dead, or a wrong port in the state file) then shows as a dark
+		// sector instead of blanking the whole camera, which is what happened
+		// when partial frames were discarded.
 		if j > 32 {
+			if contributed {
+				partialFlushes++
+				guiData := telescopeData{Telescope: telescope, Data: data_parsing.ExtractRelevantPixels(pixelValuesPadded)}
+				select {
+				case guiChannel <- guiData:
+				case <-stopListening:
+					return
+				}
+			}
 			pixelValuesPadded = [560]float64{}
 			harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
+			contributed = false
 			j = 0
 		}
 		harvesterChannels, _ = state.GetHarvesterChannel(&globalState, eventBuilderData.Source.Telescope, eventBuilderData.Source.Harvester)
 		harvestersPresent[eventBuilderData.Source.Harvester] = true
 		copy(pixelValuesPadded[harvesterChannels[0]:harvesterChannels[1]], data_parsing.ConvertByteArrayToDecimals(eventBuilderData.Data[28:308]))
+		contributed = true
 		if state.AllHarvesters(harvestersPresent) {
 			pixelValues := data_parsing.ExtractRelevantPixels(pixelValuesPadded)
 			guiData := telescopeData{Telescope: eventBuilderData.Source.Telescope, Data: pixelValues}
@@ -479,6 +589,7 @@ func eventBuilder(eventBuilderChannel <-chan eventBuilderData, guiChannel chan<-
 			}
 			pixelValuesPadded = [560]float64{}
 			harvestersPresent, _ = state.GetHarvestersMissingBool(&globalState, telescope)
+			contributed = false
 			j = 0
 		}
 	}
@@ -538,10 +649,16 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 	case <-stopListening:
 		return
 	}
-	for i := 0; ; i++ {
+	packets := 0 // Successful reads only; a read error is not a packet.
+	for {
 		select {
 		case <-stopListening:
-			log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener\n", thisIP, i, arrayPosition)
+			log.Printf("Stopping harvester listener at IP %s.\nGot %d events on harvester %v listener (telescope %d, h%d)\n", thisIP, packets, arrayPosition, thisHarvester.Telescope, thisHarvester.Harvester)
+			if packets == 0 {
+				// Most often the board's destination port does not match the
+				// state file, or the board is not running.
+				log.Printf("WARNING: telescope %d harvester h%d (listening on %s) received 0 packets this run.", thisHarvester.Telescope, thisHarvester.Harvester, thisIP)
+			}
 			return
 		default:
 			n, _, err := udpHarvesterConn.ReadFromUDP(buf)
@@ -550,6 +667,7 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 				// the select above then sees stopListening.
 				continue
 			}
+			packets++
 			_, _ = outputFile.Write(buf[:n])
 			if sendInterval > 0 && extractEventNumber(buf, true)%sendInterval == 0 { // Maybe change this to just i%sendInterval
 				copy(bufIn[:], buf[:308])

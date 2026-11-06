@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -30,16 +31,18 @@ func generateRandomString(length int) (string, error) {
 	return randomString, nil
 }
 
-// createRunFile is a function that creates a run file for a given run number and telescope.
-// It takes the run number as a string and the telescope number as an integer.
-// The function returns a pointer to the created file and an error, if any.
-// If the file already exists, it appends a random string to the file name and creates a new file.
-// If the output file cannot be created, the error is returned (it used to panic,
-// which from the run goroutine took the whole server down).
-func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.File, error) {
-	telescopeString := strconv.Itoa(telescope)
-	outputFileName := dataSaveDir + runNumber + "_" + telescopeString + ".bin"
-	randomString, _ := generateRandomString(16)
+// createUniqueFile creates <dataSaveDir>/<baseName>.bin. It never overwrites:
+// if that file exists it logs a warning and creates
+// <dataSaveDir>/<baseName>_<random hex>.bin instead.
+//
+// The directory is joined with filepath.Join, so dataSaveDir works with or
+// without a trailing slash (plain concatenation used to turn
+// "/data" + "123_1.bin" into "/data123_1.bin").
+//
+// If the output file cannot be created, the error is returned (it used to
+// panic, which from the run goroutine took the whole server down).
+func createUniqueFile(dataSaveDir string, baseName string) (*os.File, error) {
+	outputFileName := filepath.Join(dataSaveDir, baseName+".bin")
 
 	if _, existsErr := os.Stat(outputFileName); os.IsNotExist(existsErr) {
 		outputFile, createErr := os.Create(outputFileName)
@@ -48,14 +51,30 @@ func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.Fil
 		}
 		log.Println("Saving data to:", outputFileName)
 		return outputFile, nil
-	} else {
-		log.Println("File already exists:", outputFileName, "Check you're run number!")
-		outputFileName = dataSaveDir + runNumber + "_" + telescopeString + "_" + randomString + ".bin"
-		log.Println("Shunting data to:", outputFileName)
-		outputFile, createErr := os.Create(outputFileName)
-		if createErr != nil {
-			return nil, createErr
-		}
-		return outputFile, nil
 	}
+
+	randomString, _ := generateRandomString(16)
+	log.Println("File already exists:", outputFileName, "Check your run number!")
+	outputFileName = filepath.Join(dataSaveDir, baseName+"_"+randomString+".bin")
+	log.Println("Shunting data to:", outputFileName)
+	outputFile, createErr := os.Create(outputFileName)
+	if createErr != nil {
+		return nil, createErr
+	}
+	return outputFile, nil
+}
+
+// CreateRunFile creates the per-telescope run file <run>_<telescope>.bin,
+// which every harvester of the telescope writes into (runFileLayout
+// "perTelescope").
+func CreateRunFile(dataSaveDir string, runNumber string, telescope int) (*os.File, error) {
+	return createUniqueFile(dataSaveDir, runNumber+"_"+strconv.Itoa(telescope))
+}
+
+// CreateHarvesterRunFile creates the per-harvester run file
+// <run>_<telescope>_h<localPosition>.bin (runFileLayout "perHarvester").
+// The records are the same 308-byte packets as in CreateRunFile's files,
+// just one board per file, so the offline scripts read either.
+func CreateHarvesterRunFile(dataSaveDir string, runNumber string, telescope int, localPosition int) (*os.File, error) {
+	return createUniqueFile(dataSaveDir, runNumber+"_"+strconv.Itoa(telescope)+"_h"+strconv.Itoa(localPosition))
 }

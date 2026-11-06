@@ -1,0 +1,32 @@
+# systemd unit for the VO DAQ server on the trailer (DAQ) machine.
+#
+# Replace @REPO@ with the absolute path of the VO_software clone and @USER@
+# with the account that owns it and the data directory, then:
+#
+#   sudo cp deploy/vo-server.service /etc/systemd/system/vo-server.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now vo-server
+#   systemctl status vo-server        # running?
+#   journalctl -u vo-server -f        # live output (also in server/log/server.log)
+#
+# The working directory must be server/bin: the server opens
+# ../internal/server.json and ../log/server.log relative to it.
+#
+# Restart=on-failure: a crash is restarted after 2 s. An exitCmd (exit code 0)
+# is not -- but the GUI never sends one in serverMode "remote".
+
+[Unit]
+Description=VERITAS optical (VO) DAQ server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@REPO@/server/bin
+ExecStart=@REPO@/server/bin/server
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

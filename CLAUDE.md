@@ -32,8 +32,11 @@ docs/YYYY-MM-DD-<slug>-summary.md    saved AFTER execution finishes
 ```
 
 Both files share one kebab-case `<slug>`; append `-2` if a slug repeats on a date.
-Commit them along with the work. [docs/README.md](docs/README.md) specifies what each
-file contains.
+[docs/README.md](docs/README.md) specifies what each file contains.
+
+`docs/` and this CLAUDE.md are **internal references only**. Both are gitignored on
+purpose. **Never commit, stage or suggest committing them**, and don't change
+`.gitignore` to track them.
 
 Two rules that make these worth referencing later:
 
@@ -69,22 +72,28 @@ History worth knowing, because the branch names are misleading:
 ```bash
 # Go server — builds bin/server and bin/send_command
 cd server && make            # make clean to remove bin/
+cd server && make static     # statically linked, for copying to another machine (trailer PC)
 
 # Run the server. CWD MUST be server/bin: it opens ../internal/server.json
-# and ../log/server.log by relative path.
-cd server/bin && ./server
+# (override with -config) and ../log/server.log (dir auto-created) by relative path.
+cd server/bin && ./server [-config <server.json>]
 
-# Drive the server without the GUI
+# Two-machine deployment preflight (stdlib only) — see deploy/ONSITE_CHECKLIST.md
+python3 deploy/check_deploy.py --role trailer --state <state.json>
+python3 deploy/check_deploy.py --role control [--ssh]   # GUI closed, server up
+
+# Drive the server without the GUI. listen/scan send to serverControlConnIP from
+# ../internal/server.json (or --server-config <file>).
 cd server/bin && ./send_command listen <duration_s> <runID> <sendInterval> <dataSaveDir>
 cd server/bin && ./send_command generate <maxPackets> <packetInterval_us>   # fake harvesters
 cd server/bin && ./send_command --state <state.json> generate ...           # any state file
 cd server/bin && ./send_command scan <maxPackets> <start_us> <stop_us> <step_us> <dataSaveDir>
 
 # GUI — CWD MUST be gui/: it loads Genetive.qss, catalogs/asu2.dat,
-# trueLocations_VERITAS.dat, ../server/internal/server.json and
-# ../server/internal/fadc.json by relative path.
+# trueLocations_VERITAS.dat, ../server/internal/server.json (override with
+# --config) and ../server/internal/fadc.json by relative path.
 conda activate optical9
-cd gui && python Realtime_GUI.py
+cd gui && python Realtime_GUI.py [--config <server.json>]
 
 # Offline analysis — run from scripts/, they import utility_functions as a sibling
 cd scripts
@@ -185,8 +194,11 @@ carries the **entire state.json as a JSON string**, which becomes the server's
 
 `startHarvestersForRun` then fans out per run:
 - one `startHarvesterListener` goroutine per present harvester → writes raw 308-byte
-  packets straight to `<dataSaveDir><runNumber>_<telescope>.bin` and, every
-  `sendInterval` events, forwards to that telescope's event-builder channel;
+  packets straight to the run file (see `runFileLayout` below) and, every
+  `sendInterval` events, forwards to that telescope's event-builder channel. Each
+  harvester socket asks for an 8 MiB receive buffer (capped by `net.core.rmem_max`).
+  At run end it logs its packet count, and logs a `WARNING ... received 0 packets` for a
+  present board that sent nothing;
 - one `eventBuilder` goroutine per present telescope → accumulates harvester
   fragments into the padded 560-array;
 - one `guiListener` goroutine → packs all four telescopes into the 8000-byte datagram.
@@ -202,19 +214,40 @@ state). Setup errors abort the run, not the process — they used to `log.Panic`
 the goroutine and kill the server. A malformed control datagram is logged and ignored.
 
 Deliberate sloppiness to be aware of before "fixing" it: the event builder does **not**
-match event numbers across harvesters, so it flushes and resets its partial event every
-32 iterations to bound staleness; `guiChannel` is drained rather than closed (closing it
+match event numbers across harvesters, so it resets its partial event every
+32 iterations to bound staleness. Since 2026-11-05 it first **sends** that partial frame
+to the GUI, if any board contributed. A silent board then shows as a dark sector instead
+of blanking the whole camera, which is what happened when partial frames were dropped; `guiChannel` is drained rather than closed (closing it
 panicked the GUI listener); `stopListening` channels are closed, not signalled. Every
 run goroutine selects on `stopListening`, and the run waits for its listeners before
 closing the `.bin` files, so nothing leaks between runs.
 
-`CreateRunFile` never overwrites — if `<run>_<telescope>.bin` exists it shunts to
-`<run>_<telescope>_<random hex>.bin` and logs a warning, so a duplicated run number
-produces silently renamed files rather than an error.
+**Run file layout** is chosen by `runFileLayout` in server.json:
+
+- `perHarvester` (committed default since 2026-11-05) gives one
+  `<dataSaveDir>/<run>_<tel>_h<localPosition>.bin` per board, via `CreateHarvesterRunFile`.
+- `perTelescope` (also used when the key is absent or unknown) gives one
+  `<run>_<tel>.bin` shared by all of that telescope's boards, via `CreateRunFile`. That
+  was the only layout before the multi-board test.
+
+Both functions are kept on purpose. The 308-byte packet carries no board ID, so
+interleaved boards can't be separated offline. `perTelescope` is for when a board ID is
+added to the payload. Records are identical in both layouts, so the scripts read either.
+Both go through `createUniqueFile`, which uses `filepath.Join` (so `dataSaveDir` works
+without a trailing slash) and never overwrites. If the file exists it shunts to
+`..._<random hex>.bin` and logs a warning, so a duplicated run number produces silently
+renamed files rather than an error.
+
+The control socket reads up to 65536 bytes. `startRunCmd` embeds the whole state (~5 kB
+from the GUI), and the old 8000-byte buffer silently truncated a pretty-printed state
+from `send_command` into "bad JSON". **`harvesterCmd` (9)** relays a hex `payload` to
+`harvesterControlConnIP`, over a UDP conn dialled at startup. It is for when the GUI
+machine can't reach the harvester network (see `harvesterCommandsViaServer`).
 
 `send_command` takes its state file from `--state`, which defaults to the
 `configFile` constant (`../internal/states/state_veritas_2025.json`, relative to
-`server/bin/`). A file that fails to load is now an error with exit code 1. The error used to
+`server/bin/`). `listen`/`scan` send to `serverControlConnIP` read from
+`--server-config` (default `../internal/server.json`), falling back to `127.0.0.1:31250`. A file that fails to load is now an error with exit code 1. The error used to
 be discarded, which is how a doubled `states/states/` path in that constant once went
 unnoticed. `generate` sends exactly `maxPackets` packets per present harvester. They
 carry little-endian event numbers 1..N and random variance words, with zeroed
@@ -222,14 +255,27 @@ timestamps and registers.
 
 ## Config and state files
 
-- `server/internal/server.json` — socket addresses, `dataSavePath`, `sendInterval`, and
-  the command/status number tables. Loaded by **both** the server and the GUI
-  ([ui_server.py:515](gui/ui_server.py#L515)).
+- `server/internal/server.json` — socket addresses, `dataSavePath`, `sendInterval`,
+  `runFileLayout`, `serverMode`, `harvesterCommandsViaServer`, and the command/status
+  number tables. Loaded by **both** the server and the GUI (`load_config_file` in
+  [ui_server.py](gui/ui_server.py)).
+  - In a two-machine setup **the same file sits on both machines**:
+    - `serverControlConnIP` = trailer IP (the server binds it, the GUI sends to it).
+    - `gui*ConnIP` = control-room IP (the GUI binds them, the server sends to them).
+    - `dataSavePath` is the **trailer's** path, but it is the GUI's copy that matters,
+      since the GUI sends it in `startRunCmd`.
+  - Template with `CHANGE_ME_*` placeholders:
+    `server/internal/states/server_two_machine.json`.
 - `server/internal/state.json` — the array: 4 telescopes × 8 harvesters, each with
   `missing`, `ip`, `channel`, `pixelIndex`. `missing: true` removes it from a run.
 - `server/internal/states/` — presets: `state_local.json`, `state_remote.json`,
   `state_washu.json`, `state_veritas_2025.json` (T1 harvester 0 live at
-  `10.0.60.204:31261`, everything else missing). The GUI loads one through a file
+  `10.0.60.204:31261`, everything else missing), `state_veritas_multiboard.json` (T1
+  h0–h7 present at `10.0.60.204:31261…31268`. The ports past 31261 are **assumed**, not
+  confirmed). The `pixelIndex` field is display-only (state editor). The server places
+  pixels with `ExtractRelevantPixels`, which gives h6 70 and h7 50 real pixels, where the
+  presets' `pixelIndex` say 60 and 60. That is unresolved, and only visible with
+  multiple boards. The GUI loads one through a file
   dialog and can edit it in place before starting a run. Note `server_192.json` also
   lives here but is a *server* config, not a state file — the older variant with
   `harvesterControlConnIP: 192.168.1.128:5000`.
@@ -242,7 +288,12 @@ Default ports: control 31250, GUI data 31255, heartbeat 31256, status 31257; har
 listen on 3000x / 3126x per the state file. Harvester *control* commands
 (`send_harvester_packet`) are UDP sent to `harvesterControlConnIP` from the config
 (currently `10.0.10.175:5000`); the broadcast `255.255.255.255:5000` variant is
-commented out in the code.
+commented out in the code. With `harvesterCommandsViaServer: true` the GUI instead sends
+`{"command": 9, "payload": <hex>}` to the server, which relays the same bytes.
+
+`deploy/` holds the two-machine deployment kit: `ONSITE_CHECKLIST.md` (every setting to
+change, the bring-up order, troubleshooting), `check_deploy.py` (preflight), and
+`vo-server.service`. See [docs/2026-11-05-two-machine-deploy-plan.md](docs/2026-11-05-two-machine-deploy-plan.md).
 
 ## GUI notes (`gui/`)
 
@@ -266,9 +317,17 @@ diverged for a year after commit `80c6c5b` hand-edited the generated file.
 PyQt6 has no `pyrcc6`, so `resources.qrc` and `images/` describe the committed blob but
 cannot regenerate it with the current toolchain. Leave all three alone.
 
-It owns the whole run: spawns `../server/bin/server` as a subprocess with
-`cwd=server/bin`, heartbeats it once a second, sends `startRunCmd` with the current
-state embedded, and writes run metadata rows into a **local PostgreSQL** `telescope_db`
+It owns the whole run. `serverMode` in server.json decides how it gets a server:
+
+- **`local`** (default): it spawns `../server/bin/server` as a subprocess with
+  `cwd=server/bin`. Stop or close sends exitCmd.
+- **`remote`**: the server runs on another machine, the trailer PC, as the systemd unit
+  `deploy/vo-server.service`. The GUI auto-connects at startup, the server buttons read
+  Connect/Disconnect, and it **never** sends exitCmd or waits on a process
+  (`connect_remote_server` / `disconnect_remote_server`).
+
+Either way `start_heartbeats` heartbeats the server once a second, and it sends
+`startRunCmd` with the current state embedded, and writes run metadata rows into a **local PostgreSQL** `telescope_db`
 via `psycopg` (credentials are hardcoded in `connect_to_vo_db` and
 `write_VO_db_params_to_db` in [ui_run_metadata.py](gui/ui_run_metadata.py)). The run
 number is **reserved with `nextval` at Start** and inserted explicitly as `run_id`, so the

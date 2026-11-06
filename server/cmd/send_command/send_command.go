@@ -17,10 +17,25 @@ import (
 )
 
 // Change these to test things. configFile is only the default for --state.
+// controlConnIP is only the fallback: the server's control address is read
+// from serverConfigFile (--server-config), so that listen/scan reach a server
+// bound to a LAN address rather than loopback.
 var (
-	controlConnIP string = "127.0.0.1:31250"
-	configFile    string = "../internal/states/state_veritas_2025.json"
+	controlConnIP    string = "127.0.0.1:31250"
+	configFile       string = "../internal/states/state_veritas_2025.json"
+	serverConfigFile string = "../internal/server.json"
 )
+
+// serverControlAddress returns serverControlConnIP from the server config, or
+// the controlConnIP fallback if that cannot be read.
+func serverControlAddress() string {
+	cfg, err := state.LoadConfig(serverConfigFile)
+	if err != nil || cfg.ServerControlConnIP == "" {
+		fmt.Printf("Could not read serverControlConnIP from %s (%v); using %s.\n", serverConfigFile, err, controlConnIP)
+		return controlConnIP
+	}
+	return cfg.ServerControlConnIP
+}
 
 type ctrlCmd uint32
 
@@ -60,6 +75,7 @@ func main() {
 		SilenceUsage: true,
 	}
 	rootCmd.PersistentFlags().StringVar(&configFile, "state", configFile, "state file giving the harvester addresses (relative paths are from the working directory)")
+	rootCmd.PersistentFlags().StringVar(&serverConfigFile, "server-config", serverConfigFile, "server config whose serverControlConnIP listen/scan send to")
 
 	var cmd1 = &cobra.Command{
 		Use:   "generate [maxPackets] [packetInterval]",
@@ -187,7 +203,9 @@ func requestListen(duration int, runID int, sendInterval int, dataSaveDir string
 
 	fmt.Printf("command is type %T\n", dataMap["command"])
 
-	udpControlConn, err := netutils.EstablishUDPConnectionForWrite(controlConnIP)
+	serverAddress := serverControlAddress()
+	fmt.Printf("Sending start to server at %s\n", serverAddress)
+	udpControlConn, err := netutils.EstablishUDPConnectionForWrite(serverAddress)
 	if err != nil {
 		log.Panic("Got error in establishing control connection:", err)
 	}

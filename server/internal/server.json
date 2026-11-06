@@ -6,6 +6,9 @@
     "harvesterControlConnIP": "10.0.10.175:5000",
     "dataSavePath": "/home/zdhughes/optical_data/",
     "sendInterval": 30,
+    "runFileLayout": "perHarvester",
+    "serverMode": "local",
+    "harvesterCommandsViaServer": false,
     "commands": {
         "nothing": 0,
         "startRunCmd": 1,
@@ -15,7 +18,8 @@
         "startDataForwardingCmd": 5,
         "stopDataForwardingCmd": 6,
         "hearbeatCmd": 7,
-        "stopRunCmd": 8
+        "stopRunCmd": 8,
+        "harvesterCmd": 9
     },
     "status": {
         "started": 1000,
