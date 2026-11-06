@@ -131,7 +131,23 @@ checks it for you.
 
 - [ ] `server.json` identical to the trailer's (fingerprint matches), `serverMode: remote`.
 - [ ] Firewall: allow inbound UDP **31255, 31256, 31257** from the trailer.
-- [ ] PostgreSQL running (`telescope_db`).
+- [ ] Run DB (`telescope_db` on `localhost:5432`). On a new machine (RHEL family or Arch/Manjaro):
+  ```
+  sudo deploy/setup_postgres.sh --start-run-id <N>
+  ```
+  - It installs PostgreSQL, initialises the cluster in the OS default data dir, allows
+    local connections only, and creates `vo_admin`, `telescope_db` and `tblrun_info`.
+    It is safe to re-run, and never touches existing rows.
+  - Run numbers name the `.bin` files. Pick `<N>` above every run number already used
+    anywhere, so no number repeats.
+  - To carry the run history over instead, dump it on the **old** control-room PC (read-only there):
+    ```
+    pg_dump -h localhost -U vo_admin --data-only -t tblrun_info telescope_db > tblrun_info_$(hostname)_$(date +%F).sql
+    ```
+    Then on the new one: `sudo deploy/setup_postgres.sh --import tblrun_info_<host>_<date>.sql`.
+    Numbering continues after the highest imported run.
+  - `--import` and `--start-run-id` only apply while the table is empty.
+  - `check_deploy.py --role control` (below) then reports "run DB telescope_db usable … next run ID".
 - [ ] Clock synchronised. The DB times and the UNIX Time Sync pulse (c004) use this clock.
 - [ ] SSH to the FADC crate works **without a password**. The GUI cannot answer a prompt.
 - [ ] With the server running on the trailer and the **GUI closed**:

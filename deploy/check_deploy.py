@@ -35,6 +35,8 @@ REPO = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO / 'server' / 'internal' / 'server.json'
 DEFAULT_FADC = REPO / 'server' / 'internal' / 'fadc.json'
 SET_VARIANCE_PATH = '/home/vdaq/VO/set_variance/set_variance'  # Hardwired in gui/ui_server.py.
+# The GUI's run-DB connection, hardwired in gui/ui_run_metadata.py (connect_to_vo_db).
+RUN_DB = {'host': 'localhost', 'port': '5432', 'dbname': 'telescope_db', 'user': 'vo_admin', 'password': 'lsttkc#$!'}
 WANTED_RMEM_MAX = 8 << 20  # server.go harvesterSocketReadBuffer
 LOW_DISK_GB = 20
 
@@ -334,13 +336,43 @@ def check_control(config, fadc_path, do_ssh):
     try:
         with socket.create_connection(('localhost', 5432), timeout=3):
             report('PASS', "PostgreSQL is listening on localhost:5432 (run DB)")
+        check_run_db()
     except OSError as e:
-        report('FAIL', f"PostgreSQL not reachable on localhost:5432 ({e}); runs would have no DB row")
+        report('FAIL', f"PostgreSQL not reachable on localhost:5432 ({e}); runs would have no DB row"
+                       f" -- set it up with: sudo deploy/setup_postgres.sh")
 
     if do_ssh:
         check_fadc_ssh(fadc_path)
     check_firewall(f"{', '.join(gui_ports)} (GUI data/heartbeat/status)")
     check_clock()
+
+
+def check_run_db():
+    """Connect as the GUI does and read the run sequence the way read_last_run_id does.
+
+    Uses the psql client when present (the check stays stdlib-only); catches a
+    missing database, table, role or grant, which the port check above cannot.
+    """
+    psql = shutil.which('psql')
+    if psql is None:
+        report('INFO', "psql not installed, so telescope_db itself was not checked (only the port)")
+        return
+    query = ("SELECT GREATEST(CASE WHEN is_called THEN last_value + 1 ELSE last_value END, "
+             "(SELECT COALESCE(MAX(run_id), 0) + 1 FROM tblrun_info)) FROM tblrun_info_run_id_seq")
+    cmd = [psql, '-X', '-w', '-At', '-h', RUN_DB['host'], '-p', RUN_DB['port'],
+           '-U', RUN_DB['user'], '-d', RUN_DB['dbname'], '-c', query]
+    env = dict(os.environ, PGPASSWORD=RUN_DB['password'], PGCONNECT_TIMEOUT='3')
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        report('FAIL', f"run DB check via psql failed: {e}")
+        return
+    if out.returncode == 0 and out.stdout.strip().isdigit():
+        report('PASS', f"run DB {RUN_DB['dbname']} usable as {RUN_DB['user']}; next run ID {out.stdout.strip()}")
+    else:
+        error = out.stderr.strip().splitlines()[-1] if out.stderr.strip() else f"unexpected output {out.stdout!r}"
+        report('FAIL', f"run DB {RUN_DB['dbname']} not usable as {RUN_DB['user']}: {error}"
+                       f" -- set it up with: sudo deploy/setup_postgres.sh")
 
 
 def heartbeat_round_trip(config):
