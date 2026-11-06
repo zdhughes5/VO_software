@@ -281,7 +281,7 @@ class RunMetadataMixin:
         Only a preview: reserve_run_id takes the real number from the sequence
         at Start. Never goes backwards past a number already used this
         session, so a run whose DB row failed to insert is not reused (the
-        server would silently shunt its files to <run>_<tel>_<hex>.bin).
+        server would silently shunt its files to <run>_<tel>[_h<pos>]_<hex>.bin).
         """
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         next_run_id = None

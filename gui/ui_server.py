@@ -37,14 +37,35 @@ class ServerControlMixin:
         self.run_active = False       # From the Start click until the run's end status.
         self.run_confirmed = False    # Server has sent "started" for the current run.
         self.server_connected = False # Heartbeats are coming back.
+        self.heartbeatSendTimer = None
         self.heartbeatRecvTimer = None
         self.start_confirm_timer = QtCore.QTimer(self)
         self.start_confirm_timer.setSingleShot(True)
         self.start_confirm_timer.timeout.connect(self.handle_start_not_confirmed)
 
-        self.config_file = '../server/internal/server.json'
+        # Window.__init__ sets this from --config; the default keeps the old path.
+        if not getattr(self, 'config_file', None):
+            self.config_file = '../server/internal/server.json'
         self.load_config_file()
         self.establish_connections()
+
+        # serverMode "local": this GUI launches and stops server/bin/server
+        # itself. "remote": the server runs on another machine (the trailer
+        # PC) as a service; this GUI only heartbeats it and starts/stops runs,
+        # and never asks it to exit.
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.server_mode = (self.config_data or {}).get('serverMode', 'local')
+        if self.server_mode not in ('local', 'remote'):
+            logger.log(logging.WARNING, f"Unknown serverMode {self.server_mode!r} in {self.config_file}; using 'local'.", extra=extra)
+            self.server_mode = 'local'
+        if self.server_mode == 'remote':
+            self.VO_server_start_button.setText('Connect')
+            self.VO_server_stop_button.setText('Disconnect')
+            # After __init__ finishes, so every widget and attribute exists.
+            QtCore.QTimer.singleShot(0, self.start_server)
+
+    def is_remote_server(self):
+        return getattr(self, 'server_mode', 'local') == 'remote'
 
     def _setup_fadc_and_run_buttons(self):
         """Extracted verbatim from Window.__init__ (lines 670-673 of the pre-split file)."""
@@ -106,7 +127,21 @@ class ServerControlMixin:
                 datum = struct.pack('>HI', int(command, 16), hex_timestamp)
             else:
                 datum = struct.pack('>HI', int(command, 16), 0)
-            
+
+            if self.config_data.get('harvesterCommandsViaServer', False):
+                # Relay through the DAQ server, for when this machine cannot
+                # reach the harvester network itself. Same bytes, hex-encoded.
+                server_ip, server_port = self.config_data['serverControlConnIP'].split(':')
+                message = json.dumps({
+                    "command": int(self.config_data['commands']['harvesterCmd']),
+                    "payload": datum.hex(),
+                    "log": bool(log),
+                })
+                nSent = self.heartbeatSocket.writeDatagram(message.encode(), QHostAddress(server_ip), int(server_port))
+                if log:
+                    logger.log(logging.INFO, f"Sent {datum!r} to the server at {server_ip}:{server_port} for relay to {self.config_data['harvesterControlConnIP']} ({nSent} bytes)", extra=extra)
+                return
+
             # Send the datagram using self.heartbeatSocket
             datagram = QNetworkDatagram()
             datagram.setDestination(host, port)
@@ -226,7 +261,52 @@ class ServerControlMixin:
         self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
         #self.execute_binary_over_ssh(ip, username, 'ls', '-a', options=options)
 
+    def start_heartbeats(self):
+        """Heartbeat the server once a second and declare it lost after 3 s of silence."""
+        self.stop_heartbeat_timers()
+
+        self.heartbeatSendTimer = QtCore.QTimer()
+        self.heartbeatSendTimer.timeout.connect(self.send_heartbeat)
+        self.heartbeatSendTimer.start(1000)  # Send a heartbeat every 1 seconds
+
+        self.heartbeatRecvTimer = QtCore.QTimer()
+        self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
+        self.heartbeatRecvTimer.start(3000)  # Declare the server lost after 3 s without a heartbeat
+
+    def connect_remote_server(self):
+        """serverMode remote: start heartbeating a server that runs elsewhere."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.heartbeatSendTimer is not None:
+            logger.log(logging.WARNING, "Already connected (or connecting) to the remote server.", extra=extra)
+            return
+        logger.log(logging.INFO,
+                   f"Connecting to remote server at {self.config_data['serverControlConnIP']} "
+                   f"(serverMode remote; replies expected on {self.config_data['guiHeartbeatConnIP']}).",
+                   extra=extra)
+        self.VO_server_status_line.setStyleSheet("background-color: yellow; color: black;")
+        self.VO_server_status_line.setText("Connecting")
+        self.start_heartbeats()
+        self.send_heartbeat()  # Don't wait a second for the first one.
+
+    def disconnect_remote_server(self):
+        """serverMode remote: stop heartbeating. The server itself keeps running."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.run_active:
+            logger.log(logging.WARNING,
+                       f"Disconnecting during run {self.VO_db_params['run_id']}: the run continues on the server, "
+                       f"but this GUI will not see its end status or write its DB row.",
+                       extra=extra)
+        self.stop_heartbeat_timers()
+        self.server_connected = False
+        self.VO_server_status_line.setStyleSheet("background-color: yellow; color: black;")
+        self.VO_server_status_line.setText("Not connected")
+        logger.log(logging.INFO, "Stopped heartbeating the remote server; it is still running on its own machine.", extra=extra)
+        self.refresh_start_button()
+
     def start_server(self):
+        if self.is_remote_server():
+            self.connect_remote_server()
+            return
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         # poll() rather than a bare truth test: a server that died on its own
         # leaves its Popen behind, and that used to block every restart.
@@ -240,13 +320,7 @@ class ServerControlMixin:
                 server_dir = os.path.dirname(server_path)
                 self.server_process = subprocess.Popen([server_path], cwd=server_dir)
 
-                self.heartbeatSendTimer = QtCore.QTimer()
-                self.heartbeatSendTimer.timeout.connect(self.send_heartbeat)
-                self.heartbeatSendTimer.start(1000)  # Send a heartbeat every 1 seconds
-
-                self.heartbeatRecvTimer = QtCore.QTimer()
-                self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
-                self.heartbeatRecvTimer.start(3000)  # Declare the server lost after 3 s without a heartbeat
+                self.start_heartbeats()
 
                 logger.log(logging.INFO, f"Server started successfully with PID: {self.server_process.pid}", extra=extra)
             except Exception as e:
@@ -271,7 +345,13 @@ class ServerControlMixin:
 
         The old unbounded wait() froze the GUI -- and closing it -- whenever
         the server did not exit on request.
+
+        In serverMode remote this only disconnects: the server belongs to the
+        trailer machine's service and is never told to exit from here.
         """
+        if self.is_remote_server():
+            self.disconnect_remote_server()
+            return
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         if not self.server_process:
             logger.log(logging.INFO, "Server is not running.", extra=extra)

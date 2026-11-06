@@ -27,6 +27,7 @@ Created on Tue Oct 11 20:54:47 2022
 # window. That is organizational, not architectural -- real boundaries are a
 # later refactor.
 
+import argparse
 import logging
 import sys
 
@@ -69,10 +70,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow,
         'ERROR': logging.ERROR,
         'CRITICAL': logging.CRITICAL,
     }
-    def __init__(self):
-        #Execute the QMainWindow __init__. 
+    def __init__(self, config_file='../server/internal/server.json'):
+        #Execute the QMainWindow __init__.
         #QMainWindow is a QWidget; a widget without a parent is a window.
         super().__init__()
+        # server.json path; --config overrides it (ui_server reads this).
+        self.config_file = config_file
         #Draw all the stuff from the UI file.
         self.setupUi(self)
 
@@ -114,10 +117,16 @@ def load_stylesheet(app, qss_file):
         app.setStyleSheet(file.read())
 
 if __name__ == "__main__":
-        
+
+    # parse_known_args so that Qt's own arguments (-platform, ...) pass through.
+    parser = argparse.ArgumentParser(description="VO operator GUI")
+    parser.add_argument('--config', default='../server/internal/server.json',
+                        help="server config (default ../server/internal/server.json, relative to gui/)")
+    args, qt_args = parser.parse_known_args()
+
     QtCore.QThread.currentThread().setObjectName('MainThread')
-    app = QtWidgets.QApplication(sys.argv)
-    window = Window()
+    app = QtWidgets.QApplication(sys.argv[:1] + qt_args)
+    window = Window(config_file=args.config)
     install_exception_logger()
     load_stylesheet(app, "Genetive.qss")
     window.show()

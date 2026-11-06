@@ -998,28 +998,28 @@
              <item row="1" column="0">
               <widget class="QPushButton" name="harvester_command_c003_button">
                <property name="text">
-                <string>0xc003</string>
+                <string>Test Transmission</string>
                </property>
               </widget>
              </item>
              <item row="0" column="1">
               <widget class="QPushButton" name="harvester_command_c002_button">
                <property name="text">
-                <string>0xc002</string>
+                <string>Disarm Harvester</string>
                </property>
               </widget>
              </item>
              <item row="1" column="1">
               <widget class="QPushButton" name="harvester_command_c004_button">
                <property name="text">
-                <string>0xc004</string>
+                <string>UNIX Time Sync</string>
                </property>
               </widget>
              </item>
              <item row="0" column="0">
               <widget class="QPushButton" name="harvester_command_c001_button">
                <property name="text">
-                <string>0xc001</string>
+                <string>Arm Harvester</string>
                </property>
               </widget>
              </item>
