@@ -253,12 +253,14 @@ class ServerControlMixin:
         with open('../server/internal/fadc.json', 'r') as f:
             fadc_data = json.load(f)
         ip = fadc_data['telescopes'][0]['crates'][0]['ip']
+        hostname = fadc_data['telescopes'][0]['crates'][0]['hostname']
         username = fadc_data['telescopes'][0]['crates'][0]['username']
         options = fadc_data['telescopes'][0]['crates'][0]['commandOptions']
+        binary = fadc_data['telescopes'][0]['crates'][0]['binary']
         self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
         #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
         #THIS BEFORE self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
-        self.execute_binary_over_ssh(ip, username, '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
+        self.execute_binary_over_ssh(hostname, username, binary, f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
         #self.execute_binary_over_ssh(ip, username, 'ls', '-a', options=options)
 
     def start_heartbeats(self):

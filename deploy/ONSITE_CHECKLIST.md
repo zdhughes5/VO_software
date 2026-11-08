@@ -71,12 +71,13 @@ present, and T2–T4 missing.
 
 | Key | Current value | Onsite value |
 |---|---|---|
-| `telescopes[0].crates[0].ip` / `username` | `10.0.0.102` / `vdaq` | The T1 crate. This is the only crate the GUI uses (`ui_server.py:255`). |
+| `telescopes[0].crates[0].hostname` / `username` | `fadc-testcrate.vts` / `vdaq` | The T1 crate, as a name or IP the control room can reach. The GUI SSHes to `hostname` (not `ip`), and this is the only crate it uses (`set_fadc_gate_array_window` in `gui/ui_server.py`). |
+| `telescopes[0].crates[0].binary` | `/home/vdaq/VO/set_variance/set_variance` | The `set_variance` path on that crate |
 | `commandOptions` | legacy `ssh-rsa` / `aes128-cbc` flags | Unchanged, unless the crate has changed |
 
-The `set_variance` path is hardwired at `gui/ui_server.py:261` as
-`/home/vdaq/VO/set_variance/set_variance`. Check it exists on the crate. `--ssh` in §5
-checks it for you.
+`server/internal/states/fadc copy.json` is the earlier `vdaq@10.0.10.102` crate config
+(`/home/vdaq/ped_var/...` binary), kept for reference. `--ssh` in §5 checks that the
+`hostname` login and the `binary` work.
 
 ### Things that are *not* settings but will bite
 

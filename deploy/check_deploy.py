@@ -34,7 +34,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO / 'server' / 'internal' / 'server.json'
 DEFAULT_FADC = REPO / 'server' / 'internal' / 'fadc.json'
-SET_VARIANCE_PATH = '/home/vdaq/VO/set_variance/set_variance'  # Hardwired in gui/ui_server.py.
 # The GUI's run-DB connection, hardwired in gui/ui_run_metadata.py (connect_to_vo_db).
 RUN_DB = {'host': 'localhost', 'port': '5432', 'dbname': 'telescope_db', 'user': 'vo_admin', 'password': 'lsttkc#$!'}
 WANTED_RMEM_MAX = 8 << 20  # server.go harvesterSocketReadBuffer
@@ -400,30 +399,33 @@ def heartbeat_round_trip(config):
 
 
 def check_fadc_ssh(fadc_path):
-    """The GUI's set_fadc_gate_array_window uses telescopes[0].crates[0], with no password prompt possible."""
+    """The GUI's set_fadc_gate_array_window SSHes to telescopes[0].crates[0]'s hostname and runs its
+    binary, with no password prompt possible."""
     try:
         with open(fadc_path) as f:
             crate = json.load(f)['telescopes'][0]['crates'][0]
+        target = f"{crate['username']}@{crate['hostname']}"
+        binary = crate['binary']
     except (OSError, ValueError, KeyError, IndexError) as e:
-        report('FAIL', f"fadc config {fadc_path}: {e}")
+        report('FAIL', f"fadc config {fadc_path}: {e!r} (the GUI needs username, hostname and binary "
+                       f"in telescopes[0].crates[0])")
         return
     # -v only adds noise here; -X/-Y would try to forward a display.
     options = [o for o in shlex.split(crate.get('commandOptions', '')) if o not in ('-v', '-XY', '-X', '-Y')]
-    target = f"{crate['username']}@{crate['ip']}"
     cmd = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', *options, target,
-           f"test -x {SET_VARIANCE_PATH} && echo set_variance-ok"]
+           f"test -x {shlex.quote(binary)} && echo set_variance-ok"]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired) as e:
         report('FAIL', f"ssh to FADC crate {target}: {e}")
         return
     if 'set_variance-ok' in out.stdout:
-        report('PASS', f"ssh to FADC crate {target} works without a password and {SET_VARIANCE_PATH} is executable")
+        report('PASS', f"ssh to FADC crate {target} works without a password and {binary} is executable")
     elif out.returncode == 255:
         report('FAIL', f"ssh to FADC crate {target} failed (key auth needed, no password prompt possible): "
                        f"{out.stderr.strip().splitlines()[-1] if out.stderr.strip() else 'no message'}")
     else:
-        report('FAIL', f"logged in to {target} but {SET_VARIANCE_PATH} is not executable there")
+        report('FAIL', f"logged in to {target} but {binary} is not executable there")
 
 
 def main():
