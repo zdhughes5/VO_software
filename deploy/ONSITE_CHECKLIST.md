@@ -131,7 +131,7 @@ checks it for you.
 
 - [ ] `server.json` identical to the trailer's (fingerprint matches), `serverMode: remote`.
 - [ ] Firewall: allow inbound UDP **31255, 31256, 31257** from the trailer.
-- [ ] Run DB (`telescope_db` on `localhost:5432`). On a new machine (RHEL family or Arch/Manjaro):
+- [ ] Run DB (`telescope_db` on `localhost:5432`). On a new machine (RHEL family, Debian/Ubuntu or Arch/Manjaro):
   ```
   sudo deploy/setup_postgres.sh --start-run-id <N>
   ```
