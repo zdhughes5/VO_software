@@ -1,5 +1,5 @@
 {
-    "serverControlConnIP": "10.0.60.212:31250",
+    "serverControlConnIP": "10.0.1.11:31250",
     "guiDataConnIP": "10.0.1.10:31255",
     "guiHeartbeatConnIP": "10.0.1.10:31256",
     "guiStatusConnIP": "10.0.1.10:31257",
