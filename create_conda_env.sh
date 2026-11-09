@@ -11,7 +11,7 @@ echo "Reading package names from requirements.txt..."
 # Map of pip package names to conda package names (or skip if not in conda)
 declare -A PACKAGE_MAP=(
     ["PyQt5"]=""
-    ["PyQt6"]="pyqt"
+    ["PyQt6"]="pyqt6"
     ["pyqt6_sip"]=""
     ["ROOT"]="root"  # Skip - not typically available in conda
     ["msgpack_python"]=""  # Skip - old package
