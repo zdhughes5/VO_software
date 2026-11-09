@@ -36,6 +36,11 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from GUI import Ui_MainWindow
 import resources_rc
 
+try:
+    from setproctitle import setproctitle
+except ImportError:  # optional: only sets the process name shown in ps/top
+    setproctitle = None
+
 from qt_logging import logger, LogPanelMixin, install_exception_logger
 from ui_camera import CameraDisplayMixin
 from ui_run_metadata import RunMetadataMixin
@@ -124,6 +129,8 @@ if __name__ == "__main__":
                         help="server config (default ../server/internal/server.json, relative to gui/)")
     args, qt_args = parser.parse_known_args()
 
+    if setproctitle:
+        setproctitle("VO Array Control")
     QtCore.QThread.currentThread().setObjectName('MainThread')
     app = QtWidgets.QApplication(sys.argv[:1] + qt_args)
     window = Window(config_file=args.config)
