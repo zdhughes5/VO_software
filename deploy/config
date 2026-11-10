@@ -1,0 +1,15 @@
+Host 10.0.7.20
+    KexAlgorithms +diffie-hellman-group1-sha1
+    HostKeyAlgorithms +ssh-dss
+    HostKeyAlgorithms +ssh-rsa
+    PubkeyAcceptedKeyTypes +ssh-rsa
+    Ciphers +aes256-cbc
+    RequiredRSASize 256
+Host 10.0.10.102
+    HostKeyAlgorithms +ssh-rsa
+    PubkeyAcceptedKeyTypes +ssh-rsa
+    PubkeyAcceptedAlgorithms +ssh-rsa
+    KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1
+    RequiredRSASize 1024
+    Ciphers +aes256-cbc,aes128-cbc
+    IdentityFile ~/.ssh/id_rsa_vdaq-fadc1-t1
