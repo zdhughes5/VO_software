@@ -68,6 +68,9 @@ for (i = 0; i < 1; i++) {
         set_pedvar_reset();
 
         switch (option) {
+            case 0:
+                set_pedvar_off();
+                break;
             case 1:
                 set_pedvar_1khz();
                 break;
