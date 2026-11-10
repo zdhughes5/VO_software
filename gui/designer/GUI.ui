@@ -1469,6 +1469,11 @@
                  <string>16 KHz</string>
                 </property>
                </item>
+               <item>
+                <property name="text">
+                 <string>0 (pedvar off)</string>
+                </property>
+               </item>
               </widget>
              </item>
              <item>

@@ -8,10 +8,12 @@
 -- 2026-11-06). The constraint, sequence and table names match it, so a data-only
 -- dump from an old machine loads into a fresh one unchanged.
 --
--- Added since that dump: the notes column (free-text operator remarks, NULL if
--- none). The ALTER below adds it to databases created before it existed, so
--- re-running setup_postgres.sh migrates them. Old data-only dumps still load
--- (pg_dump's COPY names its columns, so notes is left NULL).
+-- Changed since that dump:
+--   * the notes column (free-text operator remarks, NULL if none)
+--   * run_window may also be 0 (pedvar calculation off, set_variance 0)
+-- The ALTERs below apply both to databases created before them, so re-running
+-- setup_postgres.sh migrates them. Old data-only dumps still load (pg_dump's
+-- COPY names its columns, so notes is left NULL).
 --
 -- Used by gui/ui_run_metadata.py:
 --   * reserve_run_id     SELECT nextval('tblrun_info_run_id_seq')  -- needs USAGE
@@ -47,12 +49,18 @@ CREATE TABLE IF NOT EXISTS public.tblrun_info (
     -- PostgreSQL store (and pg_dump print) exactly the same expressions as on hypatia.
     CONSTRAINT tblrun_info_run_status_check CHECK (run_status IN ('started', 'aborted', 'ended', 'ended_manually')),
     CONSTRAINT tblrun_info_run_type_check CHECK (run_type IN ('observing', 'calibration', 'engineering', 'other')),
-    CONSTRAINT tblrun_info_run_window_check CHECK (run_window IN (1, 2, 4, 8, 16))
+    -- 0: pedvar calculation off (set_variance 0).
+    CONSTRAINT tblrun_info_run_window_check CHECK (run_window IN (0, 1, 2, 4, 8, 16))
 );
 
 -- Migration for tables created before the notes column existed. Needs the table
 -- owner or a superuser (vo_admin is neither), so it runs here, not from the GUI.
 ALTER TABLE public.tblrun_info ADD COLUMN IF NOT EXISTS notes text;
+
+-- Migration for tables created before run_window 0 (pedvar off) was allowed.
+-- Replaced on every run of this file, so it always matches the CREATE above.
+ALTER TABLE public.tblrun_info DROP CONSTRAINT IF EXISTS tblrun_info_run_window_check;
+ALTER TABLE public.tblrun_info ADD CONSTRAINT tblrun_info_run_window_check CHECK (run_window IN (0, 1, 2, 4, 8, 16));
 
 -- Dropping the table drops the sequence too, as with a serial column.
 ALTER SEQUENCE public.tblrun_info_run_id_seq OWNED BY public.tblrun_info.run_id;
