@@ -46,6 +46,13 @@ class RunMetadataMixin:
         self.obs_params_undo_button.clicked.connect(self.obs_undo_changes)
         self.obs_params_veritas_runid_query_button.clicked.connect(self.query_veritas_sql)
 
+        # Known-sources dropdown beside Source ID: picking one fills the line.
+        self.known_sources = set()       # Distinct source_id values in tblrun_info.
+        self.session_sources = set()     # Set this session but not in the DB yet.
+        self.known_sources_db_ok = True  # So an unreachable DB is logged once, not on every refresh.
+        self.obs_params_sourceid_combo.activated.connect(self.pick_known_source)
+        self.read_known_sources()
+
     def _setup_vo_db_params(self):
         """Extracted verbatim from Window.__init__ (lines 613-668 of the pre-split file)."""
         self.start_override = False  # Debug override of the Start checks; read by refresh_start_button.
@@ -355,6 +362,52 @@ class RunMetadataMixin:
             return None
         return run_id
 
+    def read_known_sources(self):
+        """Refresh the Source ID dropdown from the source IDs already in the run DB.
+
+        Called at startup and after each run. If the DB cannot be reached the
+        current list is kept, and Source ID can still be typed in.
+        """
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        try:
+            with self.connect_to_vo_db() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT DISTINCT source_id FROM tblrun_info "
+                               "WHERE source_id IS NOT NULL AND btrim(source_id) NOT IN ('', 'null');")
+                self.known_sources = {row[0] for row in cursor.fetchall()}
+            if not self.known_sources_db_ok:
+                logger.log(logging.INFO, "Read the known sources from the VO PostgreSQL DB again.", extra=extra)
+            self.known_sources_db_ok = True
+        except Exception as e:
+            if self.known_sources_db_ok:
+                logger.log(logging.WARNING, f"Could not read the known sources from the VO PostgreSQL DB; "
+                                            f"the Source ID dropdown may be incomplete: {e}", extra=extra)
+            self.known_sources_db_ok = False
+        self.session_sources -= self.known_sources
+        self.rebuild_source_combo()
+
+    def rebuild_source_combo(self):
+        """Placeholder first, then every known source, A-Z ignoring case.
+
+        Names are kept exactly as stored, so "Crab" and "crab" are two entries.
+        """
+        names = sorted(self.known_sources | self.session_sources, key=lambda name: (name.casefold(), name))
+        combo = self.obs_params_sourceid_combo
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(f"Known sources ({len(names)})")
+        combo.addItems(names)
+        combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+
+    def pick_known_source(self, index):
+        """Copy the picked source into Source ID; the operator still presses Set."""
+        if index <= 0:
+            return
+        self.obs_params_sourceid_line.setText(self.obs_params_sourceid_combo.itemText(index))
+        # Back to the placeholder, so the combo never shows a stale name beside
+        # an edited line, and the same source can be picked again.
+        self.obs_params_sourceid_combo.setCurrentIndex(0)
+
     def obs_widgets(self):
         return [w for w, _ in self.obs_widget_map]
 
@@ -382,5 +435,11 @@ class RunMetadataMixin:
         self.VO_db_params_vrunid_line.setText(str(self.obs_params['VERITASRunNumber']))
         self.VO_db_params_run_type_line.setText(self.obs_params['RunType'])
         self.VO_db_params_duration_line.setText(str(self.obs_params['RunDuration']))
+
+        # A new source joins the dropdown now; it is in the DB once a run with it ends.
+        source = self.obs_params['SourceID']
+        if source.strip() not in ('', 'null') and source not in self.known_sources | self.session_sources:
+            self.session_sources.add(source)
+            self.rebuild_source_combo()
         
         self.restore_original_colors(self.obs_widgets())

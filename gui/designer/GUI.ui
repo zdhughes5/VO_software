@@ -145,17 +145,28 @@
             </widget>
            </item>
            <item>
-            <widget class="QLineEdit" name="obs_params_sourceid_line">
-             <property name="text">
-              <string>null</string>
-             </property>
-             <property name="maxLength">
-              <number>255</number>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
+            <layout class="QHBoxLayout" name="obs_params_sourceid_h_layout">
+             <item>
+              <widget class="QLineEdit" name="obs_params_sourceid_line">
+               <property name="text">
+                <string>null</string>
+               </property>
+               <property name="maxLength">
+                <number>255</number>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QComboBox" name="obs_params_sourceid_combo">
+               <property name="toolTip">
+                <string>Sources already in the run DB; pick one to fill Source ID</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
            <item>
             <widget class="QLabel" name="obs_params_veritas_runid_label">

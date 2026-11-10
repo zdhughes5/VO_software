@@ -501,6 +501,7 @@ class ServerControlMixin:
         self.run_confirmed = False
         self.set_gui_components_enabled(True)
         self.read_last_run_id()
+        self.read_known_sources()  # Picks up the source just written.
         self.refresh_start_button()
 
     def handle_start_not_confirmed(self):
@@ -533,6 +534,7 @@ class ServerControlMixin:
         self.obs_params_set_button.setEnabled(enabled)
         self.obs_params_save_path_line.setEnabled(enabled)
         self.obs_params_sourceid_line.setEnabled(enabled)
+        self.obs_params_sourceid_combo.setEnabled(enabled)
         self.obs_params_veritas_runid_spin.setEnabled(enabled)
         self.obs_params_veritas_runid_query_button.setEnabled(enabled)
         self.obs_params_run_type_combo.setEnabled(enabled)
