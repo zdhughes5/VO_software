@@ -3,6 +3,10 @@
 
     python3 show_runs.py          every run
     python3 show_runs.py 20       the last 20 runs
+    python3 show_runs.py --notes  the full notes of every run that has any
+                                  (combine with N for the last N runs)
+
+In the table, notes are shortened to one line; --notes shows them in full.
 
 Runs are listed oldest first, so the newest is at the bottom, next to the
 prompt. A footer gives the total number of runs and the run ID the GUI will
@@ -31,6 +35,16 @@ SUMMARY_QUERY = (
 )
 
 
+# Every column but notes, which is folded onto one line and cut short so a long
+# or multi-line note does not break the aligned table.
+TABLE_COLUMNS = (
+    "run_id, veritas_run_id, run_type, run_status, run_window, db_start_time, db_end_time, "
+    "data_start_time, data_end_time, duration, telescope_mask, harvester_mask, source_id, "
+    "CASE WHEN length(notes) > 60 THEN left(replace(notes, E'\\n', ' | '), 57) || '...' "
+    "ELSE replace(notes, E'\\n', ' | ') END AS notes"
+)
+
+
 def positive_int(text):
     value = int(text)
     if value < 1:
@@ -54,6 +68,7 @@ def run_psql(psql, query, *flags):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('n', nargs='?', type=positive_int, help="show only the last N runs (default: all)")
+    parser.add_argument('--notes', action='store_true', help="show the full notes of runs that have any")
     args = parser.parse_args()
 
     psql = shutil.which('psql')
@@ -61,12 +76,17 @@ def main():
         sys.exit("psql not found. It comes with PostgreSQL; this script needs it to read the run DB.")
 
     if args.n is None:
-        query = "SELECT * FROM tblrun_info ORDER BY run_id"
+        runs = "tblrun_info"
     else:
         # Take the newest N, then list them oldest first.
-        query = f"SELECT * FROM (SELECT * FROM tblrun_info ORDER BY run_id DESC LIMIT {args.n}) AS last ORDER BY run_id"
+        runs = f"(SELECT * FROM tblrun_info ORDER BY run_id DESC LIMIT {args.n}) AS last"
 
-    print(run_psql(psql, query), end='')
+    if args.notes:
+        query = f"SELECT run_id, notes FROM {runs} WHERE notes IS NOT NULL ORDER BY run_id"
+        print(run_psql(psql, query, '-x') or "(no notes)\n", end='')
+    else:
+        query = f"SELECT {TABLE_COLUMNS} FROM {runs} ORDER BY run_id"
+        print(run_psql(psql, query), end='')
     total, next_run = run_psql(psql, SUMMARY_QUERY, '-At').strip().split('|')
     shown = f"last {min(args.n, int(total))} of " if args.n is not None else ""
     print(f"Showing {shown}{total} runs. Next run ID: {next_run}")

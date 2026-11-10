@@ -614,6 +614,63 @@
             </layout>
            </item>
            <item>
+            <widget class="QLabel" name="VO_db_params_notes_label">
+             <property name="text">
+              <string>Run Notes</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="VO_db_params_notes_input_line">
+             <property name="toolTip">
+              <string>Type a note and press Enter or Stage. Staged notes are written to the run's DB row when the run ends.</string>
+             </property>
+             <property name="placeholderText">
+              <string>Type a note, Enter or Stage to add</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="VO_db_params_notes_button_layout">
+             <item>
+              <widget class="QPushButton" name="VO_db_params_notes_stage_button">
+               <property name="text">
+                <string>Stage</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="VO_db_params_notes_clear_button">
+               <property name="text">
+                <string>Clear</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QPlainTextEdit" name="VO_db_params_notes_staged_text">
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>70</height>
+              </size>
+             </property>
+             <property name="toolTip">
+              <string>Notes staged for the current run. Written to the DB when the run ends, then cleared.</string>
+             </property>
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+             <property name="placeholderText">
+              <string>No notes staged</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="Line" name="line_8">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>

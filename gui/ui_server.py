@@ -37,6 +37,9 @@ class ServerControlMixin:
         self.run_active = False       # From the Start click until the run's end status.
         self.run_confirmed = False    # Server has sent "started" for the current run.
         self.server_connected = False # Heartbeats are coming back.
+        # A heartbeat timeout fires every 3 s while the server is silent; it is
+        # logged once, and the reconnect is logged when heartbeats return.
+        self.heartbeat_timeout_logged = False
         self.heartbeatSendTimer = None
         self.heartbeatRecvTimer = None
         self.start_confirm_timer = QtCore.QTimer(self)
@@ -218,19 +221,19 @@ class ServerControlMixin:
             print(ssh_command)
             extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
             logger.log(logging.INFO, f'Sent request: {ssh_command}', extra=extra)
-            print('e')
+            #print('e')
             
             # Execute the command
             process = subprocess.Popen(ssh_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,  preexec_fn=lambda: signal.alarm(5))
             #process = subprocess.run(['/home/labuser/VO_software/gui/variance_script.sh'], capture_output=True, text=True, timeout=10)
-            print('f')
+            #print('f')
             # Read the output and error streams
 
             output, error = process.communicate()
             #except subprocess.TimeoutExpired:
             #    process.kill()
             #    stdout, stderr = process.communicate()
-            print('g')
+            #print('g')
             # Decode the output and error
             output = output.decode()
             error = error.decode()
@@ -274,6 +277,7 @@ class ServerControlMixin:
         self.heartbeatRecvTimer = QtCore.QTimer()
         self.heartbeatRecvTimer.timeout.connect(self.handle_heartbeat_timeout)
         self.heartbeatRecvTimer.start(3000)  # Declare the server lost after 3 s without a heartbeat
+        self.heartbeat_timeout_logged = False  # A new heartbeat session logs its first timeout afresh.
 
     def connect_remote_server(self):
         """serverMode remote: start heartbeating a server that runs elsewhere."""
@@ -393,8 +397,8 @@ class ServerControlMixin:
 
         An unchecked bind is how this fails in practice: if something else
         already holds the port, Qt returns False, the socket stays dead, and
-        the only symptom is "Heartbeat timeout" every three seconds with no
-        indication why. That happened for real -- an orphaned process held
+        the only symptom is a "Heartbeat timeout" warning with no indication
+        why. That happened for real -- an orphaned process held
         31255/31256/31257 for a day while the server replied correctly into
         its socket. The usual cause is a second GUI, or a crashed one whose
         process is still alive.
@@ -542,6 +546,8 @@ class ServerControlMixin:
         self.VO_server_stop_button.setEnabled(enabled)
         self.populate_dt.setEnabled(enabled)
         self.wrtie_db.setEnabled(enabled)
+        # The run-notes widgets (VO_db_params_notes_*) are deliberately left out:
+        # notes are meant to be staged while a run is going.
 
     def got_heartbeat(self):
         while self.heartbeatSocket.hasPendingDatagrams():
@@ -550,6 +556,10 @@ class ServerControlMixin:
         self.VO_server_status_line.setText("Connected")
         if self.heartbeatRecvTimer is not None:
             self.reset_heartbeat_timer()
+        if self.heartbeat_timeout_logged:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            logger.log(logging.INFO, "Heartbeat received. VO server reconnected.", extra=extra)
+            self.heartbeat_timeout_logged = False
         if not self.server_connected:
             self.server_connected = True
             self.refresh_start_button()
@@ -562,7 +572,9 @@ class ServerControlMixin:
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         self.VO_server_status_line.setStyleSheet("background-color: red; color: white;")
         self.VO_server_status_line.setText("Disconnected")
-        logger.log(logging.WARNING, "Heartbeat timeout. VO server disconnected.", extra=extra)
+        if not self.heartbeat_timeout_logged:
+            logger.log(logging.WARNING, "Heartbeat timeout. VO server disconnected.", extra=extra)
+            self.heartbeat_timeout_logged = True
         self.server_connected = False
         if self.run_active:
             # No end status will come from a dead server; without this the

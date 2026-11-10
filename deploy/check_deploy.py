@@ -368,10 +368,30 @@ def check_run_db():
         return
     if out.returncode == 0 and out.stdout.strip().isdigit():
         report('PASS', f"run DB {RUN_DB['dbname']} usable as {RUN_DB['user']}; next run ID {out.stdout.strip()}")
+        check_run_db_columns(cmd[:-1], env)
     else:
         error = out.stderr.strip().splitlines()[-1] if out.stderr.strip() else f"unexpected output {out.stdout!r}"
         report('FAIL', f"run DB {RUN_DB['dbname']} not usable as {RUN_DB['user']}: {error}"
                        f" -- set it up with: sudo deploy/setup_postgres.sh")
+
+
+def check_run_db_columns(psql_cmd, env):
+    """Catch a run DB set up before the notes column, which write_VO_db_params_to_db inserts into."""
+    query = ("SELECT count(*) FROM information_schema.columns "
+             "WHERE table_schema = 'public' AND table_name = 'tblrun_info' AND column_name = 'notes'")
+    try:
+        out = subprocess.run(psql_cmd + [query], capture_output=True, text=True, timeout=10, env=env)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        report('WARN', f"could not check tblrun_info's columns: {e}")
+        return
+    count = out.stdout.strip()
+    if out.returncode != 0 or not count.isdigit():
+        report('WARN', f"could not check tblrun_info's columns: {out.stderr.strip() or out.stdout.strip()!r}")
+    elif count == '0':
+        report('WARN', "tblrun_info has no notes column, so every run's DB insert will fail"
+                       " -- migrate it by re-running: sudo deploy/setup_postgres.sh")
+    else:
+        report('PASS', "tblrun_info has the notes column")
 
 
 def heartbeat_round_trip(config):

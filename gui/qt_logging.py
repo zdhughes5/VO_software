@@ -4,7 +4,7 @@ The shared ``logger`` lives here and every other module imports it from
 this one. That matters: the log panel works by attaching ``QLogHandler``
 to this exact logger object, so a module that called
 ``logging.getLogger(__name__)`` instead would still write to debug.log
-but would silently stop appearing in the operator's log panel.
+(appended across sessions) but would silently stop appearing in the operator's log panel.
 
 Every ``logger.log`` call must pass ``extra={'qThreadName': ...}``;
 the basicConfig format string references %(qThreadName)s.
@@ -12,15 +12,43 @@ the basicConfig format string references %(qThreadName)s.
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import logging
+import os
 import sys
 import traceback
 
 fs = '[%(asctime)s %(levelname)s] %(message)s'
 formatter = logging.Formatter(fs)
-#ogging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
-logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[logging.FileHandler("debug.log", mode="w")])
+
+# The persistent log: everything the log panel shows (INFO and up), plus DEBUG
+# records and other libraries' warnings, which the panel leaves out.
+# Appended, never truncated, so it keeps the history of every session. "w"
+# mode also corrupted it: a second GUI truncated the file under the first,
+# which kept writing at its old offset and left a hole of NUL bytes.
+# Anchored to this directory, not the current one, so it is always gui/debug.log.
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug.log')
+
+
+class _DefaultThreadName(logging.Filter):
+    """Supply qThreadName for records that lack it (other libraries' loggers).
+
+    Without it the format string raises KeyError and the record is lost from
+    the file, with only a '--- Logging error ---' on the terminal.
+    """
+    def filter(self, record):
+        if not hasattr(record, 'qThreadName'):
+            record.qThreadName = record.threadName
+        return True
+
+
+_file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+_file_handler.addFilter(_DefaultThreadName())
+logging.basicConfig(format='[%(asctime)s line %(lineno)d %(qThreadName)s %(levelname)s] %(message)s', handlers=[_file_handler])
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+# Marks where each session starts. Logged before the panel's handler is
+# attached, so it goes to the file only.
+logger.log(logging.INFO, f"===== GUI session started (pid {os.getpid()}) =====",
+           extra={'qThreadName': 'MainThread'})
 
 class LogSignalEmitter(QtCore.QObject):
     logSignal = QtCore.pyqtSignal(str, logging.LogRecord)

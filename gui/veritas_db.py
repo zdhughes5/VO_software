@@ -7,6 +7,7 @@ turns it into the star field the camera panels draw.
 
 from astropy.coordinates import Angle, SkyCoord, EarthLocation
 from multiprocessing import Process, Queue
+from queue import Empty
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from astropy.time import Time
 import astroplan as apl
@@ -62,6 +63,8 @@ class database_worker(QtCore.QObject):
 
         self.queue = Queue(maxsize=1)
         self.command_queue = Queue()
+        # (level, message) from the worker process, which cannot log itself.
+        self.status_queue = Queue()
         self.process = None
 
         self.start_querying_VPM_signal.connect(self.start_querying)
@@ -70,8 +73,9 @@ class database_worker(QtCore.QObject):
     def start_querying(self):
         if self.process is not None:
             self.stop_querying()
-        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config, self.command_queue))
+        self.process = Process(target=query_last_pointing, args=(self.queue, self.db_config, self.command_queue, self.status_queue))
         self.process.start()
+        self.queue_check_counter = 0
         self.vpm_timer.start(int(self.queue_check_interval*1000))  # Check the queue every 2.5 seconds
 
     def stop_querying(self):
@@ -93,15 +97,35 @@ class database_worker(QtCore.QObject):
                         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
                         logger.log(logging.ERROR, f"Pointing subprocess {self.process.pid} survived SIGKILL; abandoning it.", extra=extra)
             except Exception as e:
-                print(f"Error terminating process: {e}")
+                extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+                logger.log(logging.ERROR, f"Error terminating the pointing subprocess: {e}", extra=extra)
             finally:
                 self.process = None
         self.vpm_timer.stop()
+        self.log_worker_messages()
+
+    def log_worker_messages(self):
+        """Log whatever the pointing subprocess has reported (errors, recoveries)."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        while True:
+            try:
+                level, message = self.status_queue.get_nowait()
+            except Empty:
+                return
+            except Exception as e:
+                logger.log(logging.ERROR, f"Could not read the pointing subprocess's messages: {e}", extra=extra)
+                return
+            logger.log(level, message, extra=extra)
 
 
     def get_stars_in_fov(self):
+        self.log_worker_messages()
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         if not self.queue.empty():
             vpm = self.queue.get()
+            if self.queue_check_counter >= self.maximum_queue_checks:
+                logger.log(logging.INFO, "Pointing from the VERITAS MySQL DB worker resumed after %d seconds."
+                           % (self.queue_check_counter*self.queue_check_interval), extra=extra)
             self.VPM_fetched_signal.emit(vpm)
             self.calculate_star_offsets(vpm)
             self.query_ok_signal.emit(True)
@@ -109,10 +133,12 @@ class database_worker(QtCore.QObject):
         else:
             self.queue_check_counter += 1
             if self.queue_check_counter >= self.maximum_queue_checks:
-                extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
                 self.query_ok_signal.emit(False)
-                if self.queue_check_counter % self.maximum_queue_checks == 0:
-                    logger.log(logging.WARNING, "Haven't got pointing from VERITAS MySQL DB worker in %d seconds" % (self.queue_check_counter*self.queue_check_interval), extra=extra)
+                # Once per outage; the resume is logged above.
+                if self.queue_check_counter == self.maximum_queue_checks:
+                    logger.log(logging.WARNING, "Haven't got pointing from the VERITAS MySQL DB worker in %d seconds. "
+                               "Not repeated; logged again when pointing resumes."
+                               % (self.queue_check_counter*self.queue_check_interval), extra=extra)
 
 
     def log_throttled(self, key, level, message):
@@ -229,7 +255,8 @@ class database_worker(QtCore.QObject):
         query = 'SELECT run_id FROM tblRun_Info ORDER BY db_start_time DESC LIMIT 1'
         self.fetch_data(query)
         elapsed_time = time.time() - start_time
-        print(f"query_last_run_number took {elapsed_time:.4f} seconds")
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        logger.log(logging.DEBUG, f"query_last_run_number took {elapsed_time:.4f} seconds", extra=extra)
 
     def fetch_data(self, query):
         start_time = time.time()
@@ -239,9 +266,11 @@ class database_worker(QtCore.QObject):
             if res:
                 return res
         except Exception as e:
-            print(f"Error querying database: {e}")
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            logger.log(logging.ERROR, f"Error querying the VERITAS database: {e}", extra=extra)
         elapsed_time = time.time() - start_time
-        print(f"fetch_data took {elapsed_time:.4f} seconds")
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        logger.log(logging.DEBUG, f"fetch_data took {elapsed_time:.4f} seconds", extra=extra)
 
 
 class VeritasSQLPingWorker(QtCore.QThread):

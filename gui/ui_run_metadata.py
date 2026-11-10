@@ -106,6 +106,12 @@ class RunMetadataMixin:
         self.populate_dt.clicked.connect(self.force_unlock_start_button)
         self.wrtie_db.clicked.connect(self.write_VO_db_params_to_db)
 
+        # Run notes: optional, so deliberately kept out of VO_db_params (an empty
+        # value there blocks Start and the DB write). Usable during a run.
+        self.VO_db_params_notes_stage_button.clicked.connect(self.stage_run_note)
+        self.VO_db_params_notes_input_line.returnPressed.connect(self.stage_run_note)
+        self.VO_db_params_notes_clear_button.clicked.connect(self.clear_run_notes)
+
         # The Test tab's controls bypass the run checks, so they sit behind a
         # checkbox. They stay available, so the GUI can never lock you out
         # completely, but they cannot be hit by accident.
@@ -113,6 +119,27 @@ class RunMetadataMixin:
         self.debug_mode_check.toggled.connect(self.set_debug_mode)
 
         self.refresh_start_button()
+
+    def stage_run_note(self):
+        """Append the typed note, timestamped, to the notes written with this run's DB row."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        text = self.VO_db_params_notes_input_line.text().strip()
+        if not text:
+            return
+        note = f"[{datetime.now().strftime('%H:%M:%S')}] {text}"
+        self.VO_db_params_notes_staged_text.appendPlainText(note)
+        self.VO_db_params_notes_input_line.clear()
+        logger.log(logging.INFO, f"Note staged for run {self.VO_db_params['run_id']}: {note}", extra=extra)
+
+    def clear_run_notes(self):
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        if self.VO_db_params_notes_staged_text.toPlainText():
+            self.VO_db_params_notes_staged_text.clear()
+            logger.log(logging.INFO, "Staged run notes cleared.", extra=extra)
+
+    def staged_run_notes(self):
+        """The staged notes as stored in tblrun_info.notes: None (NULL) when there are none."""
+        return self.VO_db_params_notes_staged_text.toPlainText().strip() or None
 
     def set_debug_mode(self, enabled):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -182,6 +209,7 @@ class RunMetadataMixin:
             return
 
         connection, cursor = None, None
+        notes = self.staged_run_notes()
         try:
             # Connect to the database
             connection = psycopg.connect(
@@ -195,8 +223,8 @@ class RunMetadataMixin:
 
             # Insert the data into the database
             insert_query = """
-            INSERT INTO tblrun_info (run_id, veritas_run_id, run_type, run_status, run_window, db_start_time, db_end_time, data_start_time, data_end_time, duration, telescope_mask, harvester_mask, source_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO tblrun_info (run_id, veritas_run_id, run_type, run_status, run_window, db_start_time, db_end_time, data_start_time, data_end_time, duration, telescope_mask, harvester_mask, source_id, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             # run_id is given explicitly: it is the number the .bin files were
             # named with, reserved from the sequence in reserve_run_id. Letting
@@ -214,13 +242,17 @@ class RunMetadataMixin:
                 self.VO_db_params['duration'],  # interval
                 le(self.VO_db_params['telescope_mask']),  # integer
                 le(self.VO_db_params['harvester_mask']),  # integer
-                self.VO_db_params['source_id']  # character varying(255)
+                self.VO_db_params['source_id'],  # character varying(255)
+                notes  # text, NULL if none
             )
             cursor.execute(insert_query, run_data)
             connection.commit()
             logger.log(logging.INFO, f"VO DB parameters inserted successfully for run {self.VO_db_params['run_id']}", extra=extra)
+            # Only once they are safely in the DB, so they cannot leak into the next run.
+            self.clear_run_notes()
         except Exception as e:
-            logger.log(logging.ERROR, f"Error inserting VO DB parameters for run {self.VO_db_params['run_id']} -- its .bin files have no DB row: {e}", extra=extra)
+            logger.log(logging.ERROR, f"Error inserting VO DB parameters for run {self.VO_db_params['run_id']} -- its .bin files have no DB row: {e}"
+                       + (f"\nIts notes (still staged):\n{notes}" if notes else ""), extra=extra)
             if connection:
                 connection.rollback()
         finally:

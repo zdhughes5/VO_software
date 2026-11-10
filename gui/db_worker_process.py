@@ -1,6 +1,6 @@
 # gui/db_worker_process.py
+import logging
 import pymysql
-import time
 from datetime import datetime
 from multiprocessing import Queue
 from queue import Empty
@@ -37,10 +37,24 @@ def parse_vdb_timestamp(stamp):
     )
 
 
-def query_last_pointing(queue: Queue, db_config: dict, command_queue: Queue):
-    n = 0
+def query_last_pointing(queue: Queue, db_config: dict, command_queue: Queue, status_queue: Queue = None):
+    """Poll the VERITAS DB for each telescope's latest pointing, every 2.5 s.
+
+    Runs in its own process, which has no log handlers (it is started with
+    forkserver), so log messages go back to the GUI as (level, message) pairs
+    on status_queue, and database_worker logs them. A failure is reported once,
+    and again only if the error changes; recovery is reported once. Polling
+    keeps retrying every 2.5 s, so an unreachable DB cannot flood the log.
+    """
+    def report(level, message):
+        if status_queue is not None:
+            status_queue.put((level, message))
+        else:
+            print(message)
+
+    last_error = None
     while True:
-        start_time = time.time()
+        dbcnx = None
         try:
             dbcnx = pymysql.connect(**db_config)
             crs = dbcnx.cursor(pymysql.cursors.DictCursor)
@@ -55,37 +69,37 @@ def query_last_pointing(queue: Queue, db_config: dict, command_queue: Queue):
                 't4': 'SELECT timestamp, elevation_raw, azimuth_raw FROM tblPositioner_Telescope3_Status ORDER BY timestamp DESC LIMIT 1'
             }
             for telescope, query in queries.items():
-                query_start_time = time.time()
                 crs.execute(query)
                 res = crs.fetchone()
-                query_elapsed_time = time.time() - query_start_time
-                #print(f"Query for {telescope} took {query_elapsed_time:.4f} seconds")
                 vpm[telescope] = {'timestamp': res['timestamp'], 'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
-            total_elapsed_time = time.time() - start_time
-            #print(f"Total query_last_pointing took {total_elapsed_time:.4f} seconds")
-            
+            crs.close()
+
             if not queue.full():
                 queue.put(vpm)
             else:
                 queue.get()
                 queue.put(vpm)
 
-            # Can I not close the cursor and connection here?
-            crs.close()
-            dbcnx.close()
+            if last_error is not None:
+                report(logging.INFO, "VERITAS pointing DB queries are working again.")
+                last_error = None
         except Exception as e:
-            print(f"Error in query_last_pointing: {e}")
-            continue
-        n += 1
-        #print('Beep ', n)
-        # Assuming command_queue is an instance of queue.Queue
+            error = f"{type(e).__name__}: {e}"
+            if error != last_error:
+                report(logging.ERROR, f"VERITAS pointing DB query failed: {error}. "
+                                      "Retrying every 2.5 s; logged again only if the error changes, and when it clears.")
+                last_error = error
+        finally:
+            if dbcnx is not None:
+                try:
+                    dbcnx.close()
+                except Exception:
+                    pass
+
+        # Wait here after a failure too: retrying at once spun in a tight loop
+        # against an unreachable DB and never saw the stop command.
         try:
-            item = command_queue.get(timeout=2.5)  # Wait for up to 5 seconds
-            print(f"VPM querying subprocess exiting...")
+            command_queue.get(timeout=2.5)
             exit(0)
-            break
-            # Process the item
         except Empty:
-            # Handle the case where the queue is empty after the timeout
-            #print("No command received")
             pass
