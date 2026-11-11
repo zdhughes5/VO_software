@@ -99,6 +99,8 @@ done
 
 if [[ -n "$IMPORT_FILE" ]]; then
     [[ -f "$IMPORT_FILE" && -r "$IMPORT_FILE" ]] || die "--import file '$IMPORT_FILE' is not a readable file"
+    # Absolute, because the script later does cd / before the import reads it.
+    IMPORT_FILE=$(realpath -- "$IMPORT_FILE")
     # It runs as a superuser, so make sure it is what the help says it is.
     grep -Eq '^(COPY|INSERT INTO) public\.tblrun_info[ (]' "$IMPORT_FILE" \
         || die "'$IMPORT_FILE' has no COPY/INSERT into public.tblrun_info. Make it with:

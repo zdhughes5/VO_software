@@ -293,9 +293,18 @@ class CameraDisplayMixin:
 
         # readyRead can fire with nothing to read, and anything that is not a
         # full 4 x 500 float32 frame would break the slicing in update().
-        if datagram is None or len(datagram.data()) != 8000:
+        if datagram is None:
+            return
+        size = len(datagram.data())
+        if size != 8000:
+            # Data that arrives but is never drawn looks like a frozen display.
+            if not self.bad_datagram_logged:
+                extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+                logger.log(logging.WARNING, f"Ignoring {size}-byte datagrams on the data port (expected 8000).", extra=extra)
+                self.bad_datagram_logged = True
             return
         pixelData = np.frombuffer(datagram.data(), dtype=np.float32)
         self.pixelData = pixelData
         #print(self.pixelData)
         self.update_camera_display()
+        self.got_gui_data()

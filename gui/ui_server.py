@@ -19,6 +19,9 @@ import time
 
 from qt_logging import logger
 
+# During a run, warn when no display frame has arrived for this long.
+GUI_DATA_TIMEOUT_MS = 2000
+
 class ServerControlMixin:
     """DAQ server, harvester and FADC control.
 
@@ -45,6 +48,14 @@ class ServerControlMixin:
         self.start_confirm_timer = QtCore.QTimer(self)
         self.start_confirm_timer.setSingleShot(True)
         self.start_confirm_timer.timeout.connect(self.handle_start_not_confirmed)
+        # Display-data watchdog, armed only during a run. Like the heartbeat,
+        # a gap is logged once and the recovery is logged when frames return.
+        self.data_recv_timer = QtCore.QTimer(self)
+        self.data_recv_timer.setSingleShot(True)
+        self.data_recv_timer.timeout.connect(self.handle_data_timeout)
+        self.data_watchdog_armed = False  # From "started" to end_run, unless sendInterval is 0.
+        self.data_timeout_logged = False
+        self.bad_datagram_logged = False  # Wrong-size datagrams on the data port, once per run.
 
         # Window.__init__ sets this from --config; the default keeps the old path.
         if not getattr(self, 'config_file', None):
@@ -73,9 +84,15 @@ class ServerControlMixin:
     def _setup_fadc_and_run_buttons(self):
         """Extracted verbatim from Window.__init__ (lines 670-673 of the pre-split file)."""
         self.fadc_gate_array_window_set_button.clicked.connect(self.set_fadc_gate_array_window)
-
-        self.send_stop_button.clicked.connect(self.send_stop_message)
         #self.StartButton.clicked.connect(self.request_listen)
+
+        # Test tab: the same choices as the Control-tab combo, copied so there
+        # is one list to maintain.
+        control = self.fadc_gate_array_window_combo
+        for i in range(control.count()):
+            self.fadc_override_combo.addItem(control.itemText(i))
+        self.fadc_override_combo.setCurrentIndex(control.currentIndex())
+        self.fadc_override_button.clicked.connect(self.use_fadc_window_without_setting)
 
     def _setup_harvester_controls(self):
         """Extracted verbatim from Window.__init__ (lines 675-689 of the pre-split file)."""
@@ -83,27 +100,10 @@ class ServerControlMixin:
         self.harvester_command_c002_button.clicked.connect(lambda: self.send_harvester_packet('c002', log=True))
         self.harvester_command_c003_button.clicked.connect(lambda: self.send_harvester_packet('c003', log=True))
         self.harvester_command_c004_button.clicked.connect(lambda: self.send_harvester_packet('c004', log=True))
-        
-        # Initialize the timer
-        self.harvester_timer = QtCore.QTimer(self)
-        self.harvester_timer.timeout.connect(lambda: self.send_harvester_packet('c004'))
-        
-        self.harvester_command_start_time_pulse_button.clicked.connect(self.start_harvester_timer)
-        self.harvester_command_stop_time_pulse_button.clicked.connect(self.stop_harvester_timer)
 
         self.sample_average = 1
 
         self.data_display_sample_button.clicked.connect(self.update_sample_average)
-
-    def start_harvester_timer(self):
-        self.harvester_timer.start(1000)  # Start the timer with a 1-second interval
-        self.harvester_command_time_status_label.setStyleSheet("background-color: green; color: white;")
-        self.harvester_command_time_status_label.setText("Active")
-
-    def stop_harvester_timer(self):
-        self.harvester_timer.stop()  # Stop the timer
-        self.harvester_command_time_status_label.setStyleSheet("background-color: yellow; color: black;")
-        self.harvester_command_time_status_label.setText("Inactive")
 
     def send_harvester_packet(self, command, log=False):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
@@ -260,11 +260,24 @@ class ServerControlMixin:
         username = fadc_data['telescopes'][0]['crates'][0]['username']
         options = fadc_data['telescopes'][0]['crates'][0]['commandOptions']
         binary = fadc_data['telescopes'][0]['crates'][0]['binary']
-        self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
+        self.record_fadc_window(self.fadc_gate_array_window_combo.currentText())
         #self.execute_binary_over_ssh('10.0.10.102', 'vdaq', '/home/vdaq/VO/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
         #THIS BEFORE self.execute_binary_over_ssh('10.0.7.20', 'observer', '/home/observer/zach/VERITAS_upgrade/washu-fadc/set_variance/set_variance', f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}')
         self.execute_binary_over_ssh(hostname, username, binary, f'{self.fadc_gate_array_window_combo.currentText().split(' ')[0]}', options=options)
         #self.execute_binary_over_ssh(ip, username, 'ls', '-a', options=options)
+
+    def record_fadc_window(self, combo_text):
+        """Put the window from an FADC combo entry ("4 KHz" -> "4") in the run window field."""
+        window = combo_text.split(' ')[0]
+        self.VO_db_params_run_window_line.setText(window)
+        return window
+
+    def use_fadc_window_without_setting(self):
+        """Test tab: record the window as already set on the crates, without running set_variance."""
+        extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+        self.fadc_gate_array_window_combo.setCurrentIndex(self.fadc_override_combo.currentIndex())
+        window = self.record_fadc_window(self.fadc_override_combo.currentText())
+        logger.log(logging.WARNING, f"FADC window {window} recorded without running set_variance; the crates must already have it.", extra=extra)
 
     def start_heartbeats(self):
         """Heartbeat the server once a second and declare it lost after 3 s of silence."""
@@ -477,6 +490,7 @@ class ServerControlMixin:
             self.VO_db_params_filled['db_end_time'] = False
             self.VO_db_params_filled['data_end_time'] = False
             self.set_gui_components_enabled(False)
+            self.start_data_watchdog()
         elif status_code == self.config_data["status"]["aborted"]:
             # Sent when the server could not set the run up (bad data dir,
             # harvester address not on this host, ...). The server log says which.
@@ -497,6 +511,7 @@ class ServerControlMixin:
     def end_run(self):
         """Release the GUI after a run, however it ended, and move to the next run ID."""
         self.start_confirm_timer.stop()
+        self.stop_data_watchdog()
         self.run_active = False
         self.run_confirmed = False
         self.set_gui_components_enabled(True)
@@ -542,12 +557,14 @@ class ServerControlMixin:
         self.veritas_sql_ping_button.setEnabled(enabled)
         self.fadc_gate_array_window_set_button.setEnabled(enabled)
         self.fadc_gate_array_window_combo.setEnabled(enabled)
+        self.fadc_override_button.setEnabled(enabled)
+        self.fadc_override_combo.setEnabled(enabled)
         # A new state mid-run would change the masks written to the DB for the
         # run in progress; stopping the server mid-run loses its DB row.
         self.actionLoad_state_file.setEnabled(enabled)
         self.VO_server_stop_button.setEnabled(enabled)
-        self.populate_dt.setEnabled(enabled)
-        self.wrtie_db.setEnabled(enabled)
+        self.force_start_button.setEnabled(enabled)
+        self.write_db_button.setEnabled(enabled)
         # The run-notes widgets (VO_db_params_notes_*) are deliberately left out:
         # notes are meant to be staged while a run is going.
 
@@ -584,6 +601,49 @@ class ServerControlMixin:
             logger.log(logging.ERROR, f"Lost the server during run {self.VO_db_params['run_id']}; releasing the controls. No DB row will be written unless the server recovers and reports the run's end.", extra=extra)
             self.end_run()
         self.refresh_start_button()
+
+    def set_data_status(self, text, style=""):
+        self.VO_server_data_line.setStyleSheet(style)
+        self.VO_server_data_line.setText(text)
+
+    def start_data_watchdog(self):
+        """Arm the display-data watchdog at the start of a run."""
+        self.data_timeout_logged = False
+        self.bad_datagram_logged = False
+        if int(self.config_data.get('sendInterval', 0)) <= 0:
+            # The server sends no display frames at all; nothing to watch.
+            self.set_data_status("Off", "background-color: grey; color: white;")
+            return
+        self.data_watchdog_armed = True
+        self.set_data_status("Waiting", "background-color: yellow; color: black;")
+        self.data_recv_timer.start(GUI_DATA_TIMEOUT_MS)
+
+    def stop_data_watchdog(self):
+        self.data_watchdog_armed = False
+        self.data_recv_timer.stop()
+        self.data_timeout_logged = False
+        self.bad_datagram_logged = False
+        self.set_data_status("Idle")
+
+    def got_gui_data(self):
+        """A display frame arrived: restart the watchdog and report a recovery once."""
+        if not self.data_watchdog_armed:
+            return
+        self.data_recv_timer.start(GUI_DATA_TIMEOUT_MS)
+        if self.VO_server_data_line.text() != "Receiving":
+            self.set_data_status("Receiving", "background-color: green; color: white;")
+        if self.data_timeout_logged:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            logger.log(logging.INFO, "Display data from the server resumed.", extra=extra)
+            self.data_timeout_logged = False
+
+    def handle_data_timeout(self):
+        self.set_data_status("No data", "background-color: red; color: white;")
+        if not self.data_timeout_logged:
+            extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
+            logger.log(logging.WARNING, f"No display data from the server for {GUI_DATA_TIMEOUT_MS / 1000:g} s during run "
+                       f"{self.VO_db_params['run_id']}. The server may still be recording; check server/log/server.log.", extra=extra)
+            self.data_timeout_logged = True
 
     def send_heartbeat(self):
         server_control_ip, server_control_port = self.config_data["serverControlConnIP"].split(':')

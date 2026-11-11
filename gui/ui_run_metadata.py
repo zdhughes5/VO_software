@@ -90,7 +90,7 @@ class RunMetadataMixin:
 
         self.read_last_run_id()
 
-        self.test_button.clicked.connect(self.dump_VO_db_params)
+        self.log_run_params_button.clicked.connect(self.dump_VO_db_params)
 
 
         self.VO_db_params_runid_line.textChanged.connect(self.update_VO_db_params)
@@ -109,9 +109,8 @@ class RunMetadataMixin:
 
         self.update_VO_db_params()
 
-        #self.populate_dt.clicked.connect(self.set_current_datetime)
-        self.populate_dt.clicked.connect(self.force_unlock_start_button)
-        self.wrtie_db.clicked.connect(self.write_VO_db_params_to_db)
+        self.force_start_button.clicked.connect(self.force_unlock_start_button)
+        self.write_db_button.clicked.connect(self.write_VO_db_params_to_db)
 
         # Run notes: optional, so deliberately kept out of VO_db_params (an empty
         # value there blocks Start and the DB write). Usable during a run.
@@ -154,13 +153,13 @@ class RunMetadataMixin:
         if not enabled:
             self.start_override = False
         logger.log(logging.WARNING if enabled else logging.INFO,
-                   f"Debug controls {'enabled -- populate dt overrides the Start checks' if enabled else 'disabled'}.", extra=extra)
+                   f"Debug controls {'enabled -- Force-enable Start overrides the Start checks' if enabled else 'disabled'}.", extra=extra)
         self.refresh_start_button()
 
     def force_unlock_start_button(self):
         """Debug override: enable Start whatever the checks say, until debug mode is switched off."""
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        self.VO_db_params_run_window_line.setText(self.fadc_gate_array_window_combo.currentText().split(' ')[0])
+        self.record_fadc_window(self.fadc_gate_array_window_combo.currentText())
         self.start_override = True
         logger.log(logging.WARNING, "Start force-enabled by the debug override. Missing: " + (", ".join(self.start_blockers()) or "nothing"), extra=extra)
         self.refresh_start_button()
@@ -201,13 +200,6 @@ class RunMetadataMixin:
 
     def get_VO_db_params_filled_short(self):
         return {key: self.VO_db_params_filled[key] for key in ['run_id', 'veritas_run_id', 'run_type', 'run_window', 'duration', 'telescope_mask', 'harvester_mask', 'source_id']}
-
-    def set_current_datetime(self):
-        self.VO_db_params_run_status_line.setText('ended')
-        self.VO_db_params_db_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        self.VO_db_params_data_start_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        self.VO_db_params_db_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        self.VO_db_params_data_end_time_line.setText(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def write_VO_db_params_to_db(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }

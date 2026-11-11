@@ -40,10 +40,10 @@
            </size>
           </property>
           <property name="frameShape">
-           <enum>QFrame::Box</enum>
+           <enum>QFrame::Shape::Box</enum>
           </property>
           <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
@@ -52,7 +52,6 @@
               <font>
                <family>Sans Serif</family>
                <pointsize>24</pointsize>
-               <weight>75</weight>
                <bold>true</bold>
                <underline>false</underline>
                <strikeout>false</strikeout>
@@ -63,7 +62,7 @@
               <string>Observing Parameters</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -72,7 +71,7 @@
              <item>
               <spacer name="obs_params_left_hspacer_1">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -99,7 +98,7 @@
              <item>
               <spacer name="obs_params_right_hspacer_1">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -117,7 +116,7 @@
               <string>Save data file</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -127,7 +126,7 @@
               <string>null</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+              <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
              </property>
              <property name="readOnly">
               <bool>true</bool>
@@ -140,7 +139,7 @@
               <string>Source ID</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -162,7 +161,7 @@
                 <number>255</number>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -173,7 +172,6 @@
              <property name="font">
               <font>
                <pointsize>10</pointsize>
-               <weight>50</weight>
                <bold>false</bold>
               </font>
              </property>
@@ -181,7 +179,7 @@
               <string>VERITAS Run Number</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -190,7 +188,7 @@
              <item>
               <widget class="QSpinBox" name="obs_params_veritas_runid_spin">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="maximum">
                 <number>1000000</number>
@@ -218,7 +216,7 @@
              <item row="2" column="1">
               <widget class="QSpinBox" name="obs_params_duration_spin">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="maximum">
                 <number>86400</number>
@@ -237,7 +235,7 @@
                 </size>
                </property>
                <property name="layoutDirection">
-                <enum>Qt::LeftToRight</enum>
+                <enum>Qt::LayoutDirection::LeftToRight</enum>
                </property>
                <property name="autoFillBackground">
                 <bool>false</bool>
@@ -277,7 +275,7 @@
              <item row="1" column="0">
               <spacer name="obs_params_left_hspacer_2">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -290,7 +288,7 @@
              <item row="1" column="3">
               <spacer name="obs_params_right_hspacer_2">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -305,7 +303,7 @@
            <item>
             <widget class="Line" name="line_7">
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
@@ -313,18 +311,17 @@
             <widget class="Line" name="line_5">
              <property name="font">
               <font>
-               <weight>50</weight>
                <bold>false</bold>
               </font>
              </property>
              <property name="frameShadow">
-              <enum>QFrame::Sunken</enum>
+              <enum>QFrame::Shadow::Sunken</enum>
              </property>
              <property name="lineWidth">
               <number>1</number>
              </property>
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
@@ -333,7 +330,6 @@
              <property name="font">
               <font>
                <pointsize>11</pointsize>
-               <weight>75</weight>
                <bold>true</bold>
               </font>
              </property>
@@ -341,7 +337,7 @@
               <string>VO Database Parameters</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -350,7 +346,7 @@
              <item row="5" column="0">
               <widget class="QLineEdit" name="VO_db_params_run_window_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -363,7 +359,7 @@
                 <string>Duration</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -373,14 +369,14 @@
                 <string>Data End Time</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
              <item row="5" column="2">
               <widget class="QLineEdit" name="VO_db_params_duration_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -390,7 +386,7 @@
              <item row="8" column="0">
               <widget class="QLineEdit" name="VO_db_params_telescope_mask_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -403,7 +399,7 @@
                 <string>null</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -416,7 +412,7 @@
                 <string>Telescope Mask</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -426,7 +422,7 @@
                 <string>null</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -436,7 +432,7 @@
              <item row="9" column="0">
               <widget class="QLineEdit" name="VO_db_params_sourceid_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -449,7 +445,7 @@
                 <string>VERITAS Run ID</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -459,7 +455,7 @@
                 <string>DB End Time</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -469,7 +465,7 @@
                 <string>null</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -479,7 +475,7 @@
              <item row="2" column="2">
               <widget class="QLineEdit" name="VO_db_params_vrunid_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -492,7 +488,7 @@
                 <string>DB Start Time</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -502,7 +498,7 @@
                 <string>null</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -515,7 +511,7 @@
                 <string>Run Type</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -525,7 +521,7 @@
                 <string>Run Window</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -535,7 +531,7 @@
                 <string>null</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -548,7 +544,7 @@
                 <string>Harvester Mask</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -558,14 +554,14 @@
                 <string>Run Status</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
              <item row="2" column="0">
               <widget class="QLineEdit" name="VO_db_params_runid_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -575,7 +571,7 @@
              <item row="3" column="0">
               <widget class="QLineEdit" name="VO_db_params_run_type_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -588,14 +584,14 @@
                 <string>Data Start Time</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
              <item row="8" column="2">
               <widget class="QLineEdit" name="VO_db_params_harvester_mask_line">
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
                <property name="readOnly">
                 <bool>true</bool>
@@ -608,7 +604,7 @@
                 <string>Run ID</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -618,7 +614,7 @@
                 <string>Source ID</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -630,7 +626,7 @@
               <string>Run Notes</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -684,7 +680,7 @@
            <item>
             <widget class="Line" name="line_8">
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
@@ -699,7 +695,6 @@
              <property name="font">
               <font>
                <pointsize>11</pointsize>
-               <weight>75</weight>
                <bold>true</bold>
               </font>
              </property>
@@ -707,7 +702,7 @@
               <string>Data Display</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -717,14 +712,14 @@
               <string>PMTs Selected</string>
              </property>
              <property name="alignment">
-              <set>Qt::AlignCenter</set>
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
            <item>
             <widget class="QLineEdit" name="data_display_pmt_line">
              <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
              </property>
              <property name="readOnly">
               <bool>true</bool>
@@ -736,7 +731,7 @@
              <item>
               <spacer name="data_display_hspacer">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -787,7 +782,7 @@
              <item>
               <spacer name="data_display_hspacer_2">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -821,7 +816,7 @@
              <item>
               <spacer name="horizontalSpacer_3">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -843,7 +838,7 @@
            <item>
             <spacer name="main_control_frame_vspacer">
              <property name="orientation">
-              <enum>Qt::Vertical</enum>
+              <enum>Qt::Orientation::Vertical</enum>
              </property>
              <property name="sizeHint" stdset="0">
               <size>
@@ -856,7 +851,7 @@
            <item>
             <widget class="Line" name="line_3">
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
@@ -883,7 +878,6 @@
                 <font>
                  <family>Sans Serif</family>
                  <pointsize>25</pointsize>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -907,7 +901,6 @@
                 <font>
                  <family>Sans Serif</family>
                  <pointsize>25</pointsize>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -924,7 +917,7 @@
         <item row="2" column="1">
          <spacer name="window_bottom_vspacer">
           <property name="orientation">
-           <enum>Qt::Vertical</enum>
+           <enum>Qt::Orientation::Vertical</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
@@ -953,7 +946,7 @@
         <item row="1" column="3">
          <spacer name="window_right_hspacer">
           <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+           <enum>Qt::Orientation::Horizontal</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
@@ -973,301 +966,19 @@
           </property>
           <property name="font">
            <font>
-            <weight>50</weight>
             <bold>false</bold>
            </font>
           </property>
           <property name="frameShape">
-           <enum>QFrame::Box</enum>
+           <enum>QFrame::Shape::Box</enum>
           </property>
           <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
+           <enum>QFrame::Shadow::Raised</enum>
           </property>
           <property name="lineWidth">
            <number>1</number>
           </property>
           <layout class="QGridLayout" name="gridLayout_4">
-           <item row="0" column="0">
-            <widget class="QLabel" name="veritas_sql_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>VERITAS SQL Server</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="22" column="0">
-            <widget class="QPlainTextEdit" name="log_edit">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="font">
-              <font>
-               <family>Serif</family>
-               <pointsize>9</pointsize>
-               <weight>50</weight>
-               <bold>false</bold>
-              </font>
-             </property>
-             <property name="acceptDrops">
-              <bool>false</bool>
-             </property>
-             <property name="undoRedoEnabled">
-              <bool>false</bool>
-             </property>
-             <property name="readOnly">
-              <bool>true</bool>
-             </property>
-             <property name="plainText">
-              <string/>
-             </property>
-             <property name="backgroundVisible">
-              <bool>false</bool>
-             </property>
-            </widget>
-           </item>
-           <item row="8" column="0">
-            <widget class="QLabel" name="fadc_gate_array_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>FADC Gate Array</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="12" column="0">
-            <widget class="Line" name="line_4">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="14" column="0">
-            <layout class="QGridLayout" name="harvester_command_grid_layout">
-             <item row="1" column="0">
-              <widget class="QPushButton" name="harvester_command_c003_button">
-               <property name="text">
-                <string>Test Transmission</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QPushButton" name="harvester_command_c002_button">
-               <property name="text">
-                <string>Disarm Harvester</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QPushButton" name="harvester_command_c004_button">
-               <property name="text">
-                <string>UNIX Time Sync</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QPushButton" name="harvester_command_c001_button">
-               <property name="text">
-                <string>Arm Harvester</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="21" column="0">
-            <widget class="QLabel" name="log_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>Log</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="11" column="0">
-            <widget class="Line" name="line_6">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="7" column="0">
-            <widget class="Line" name="line_2">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <layout class="QHBoxLayout" name="veritas_sql_h_layout_1">
-             <item>
-              <spacer name="veritas_sql_ping_hspacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="veritas_sql_ping_line">
-               <property name="enabled">
-                <bool>true</bool>
-               </property>
-               <property name="text">
-                <string>-</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="veritas_sql_ping_button">
-               <property name="text">
-                <string>Ping</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="VO_server_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>VO Server</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="13" column="0">
-            <widget class="QLabel" name="harvester_command_title_label">
-             <property name="font">
-              <font>
-               <pointsize>11</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>Harvester Commands</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="19" column="0">
-            <layout class="QHBoxLayout" name="harvester_command_h_layout">
-             <item>
-              <spacer name="horizontalSpacer_2">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <layout class="QVBoxLayout" name="harvester_command_v_layout_2">
-               <item>
-                <widget class="QLabel" name="harvester_command_blank_label_1">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLineEdit" name="harvester_command_time_status_label">
-                 <property name="text">
-                  <string>Offline</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignCenter</set>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="harvester_command_blank_label_2">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QVBoxLayout" name="harvester_command_v_layout_1">
-               <item>
-                <widget class="QPushButton" name="harvester_command_start_time_pulse_button">
-                 <property name="text">
-                  <string>Start</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QPushButton" name="harvester_command_stop_time_pulse_button">
-                 <property name="text">
-                  <string>Stop</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-            </layout>
-           </item>
-           <item row="4" column="0">
-            <widget class="Line" name="line">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
            <item row="6" column="0">
             <layout class="QHBoxLayout" name="VO_server_h_layout">
              <item>
@@ -1278,14 +989,14 @@
                   <string>IP</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
                <item>
                 <widget class="QLineEdit" name="VO_server_ip_line">
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -1306,7 +1017,7 @@
                   <string>Status</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -1316,7 +1027,7 @@
                   <string>Offline</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                  <property name="readOnly">
                   <bool>true</bool>
@@ -1325,6 +1036,43 @@
                </item>
                <item>
                 <widget class="QLabel" name="VO_server_blank_label">
+                 <property name="text">
+                  <string/>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="VO_server_v_layout_4">
+               <item>
+                <widget class="QLabel" name="VO_server_data_label">
+                 <property name="text">
+                  <string>Data</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="VO_server_data_line">
+                 <property name="toolTip">
+                  <string>Display frames from the server during a run. Turns red if none arrive for 2 s.</string>
+                 </property>
+                 <property name="text">
+                  <string>Idle</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
+                 </property>
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="VO_server_blank_label_3">
                  <property name="text">
                   <string/>
                  </property>
@@ -1352,12 +1100,35 @@
              </item>
             </layout>
            </item>
+           <item row="4" column="0">
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="veritas_sql_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>VERITAS SQL Server</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
            <item row="3" column="0">
             <layout class="QHBoxLayout" name="veritas_sql_h_layout_2">
              <item>
               <spacer name="veritas_sql_status_hspacer">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -1375,7 +1146,7 @@
                   <string>Status</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -1385,7 +1156,7 @@
                   <string>Offline</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                  <property name="readOnly">
                   <bool>true</bool>
@@ -1421,12 +1192,26 @@
              </item>
             </layout>
            </item>
+           <item row="11" column="0">
+            <widget class="Line" name="line_6">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="Line" name="line_2">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
            <item row="9" column="0">
             <layout class="QHBoxLayout" name="fadc_gate_array_h_layout">
              <item>
               <spacer name="fadc_gate_array_left_hspacer">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -1485,10 +1270,185 @@
              </item>
             </layout>
            </item>
+           <item row="13" column="0">
+            <widget class="QLabel" name="harvester_command_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Harvester Commands</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
            <item row="20" column="0">
+            <widget class="QLabel" name="log_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>Log</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <layout class="QHBoxLayout" name="veritas_sql_h_layout_1">
+             <item>
+              <spacer name="veritas_sql_ping_hspacer">
+               <property name="orientation">
+                <enum>Qt::Orientation::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="veritas_sql_ping_line">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>-</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignCenter</set>
+               </property>
+               <property name="readOnly">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="veritas_sql_ping_button">
+               <property name="text">
+                <string>Ping</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="12" column="0">
+            <widget class="Line" name="line_4">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="0">
+            <widget class="QLabel" name="fadc_gate_array_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>FADC Gate Array</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="14" column="0">
+            <layout class="QGridLayout" name="harvester_command_grid_layout">
+             <item row="1" column="0">
+              <widget class="QPushButton" name="harvester_command_c003_button">
+               <property name="text">
+                <string>Test Transmission</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QPushButton" name="harvester_command_c002_button">
+               <property name="text">
+                <string>Disarm Harvester</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QPushButton" name="harvester_command_c004_button">
+               <property name="text">
+                <string>UNIX Time Sync</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QPushButton" name="harvester_command_c001_button">
+               <property name="text">
+                <string>Arm Harvester</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="21" column="0">
+            <widget class="QPlainTextEdit" name="log_edit">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="font">
+              <font>
+               <family>Serif</family>
+               <pointsize>9</pointsize>
+               <bold>false</bold>
+              </font>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="undoRedoEnabled">
+              <bool>false</bool>
+             </property>
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+             <property name="plainText">
+              <string/>
+             </property>
+             <property name="backgroundVisible">
+              <bool>false</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="19" column="0">
             <widget class="Line" name="line_9">
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="VO_server_title_label">
+             <property name="font">
+              <font>
+               <pointsize>11</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="text">
+              <string>VO Server</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -1512,18 +1472,18 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>1737</width>
-             <height>727</height>
+             <width>1763</width>
+             <height>794</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_24">
             <item row="3" column="0">
              <widget class="QFrame" name="t3_state_frame">
               <property name="frameShape">
-               <enum>QFrame::Box</enum>
+               <enum>QFrame::Shape::Box</enum>
               </property>
               <property name="frameShadow">
-               <enum>QFrame::Raised</enum>
+               <enum>QFrame::Shadow::Raised</enum>
               </property>
               <property name="lineWidth">
                <number>2</number>
@@ -1535,7 +1495,7 @@
                   <string>Telescope 3</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -1544,7 +1504,7 @@
                  <item>
                   <spacer name="t3_state_left_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -1567,7 +1527,7 @@
                  <item>
                   <spacer name="t3_state_right_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -1587,7 +1547,7 @@
                     <string>Channel End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1597,7 +1557,7 @@
                     <string>Pixel Index Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1607,7 +1567,7 @@
                     <string>Harvester</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1617,7 +1577,7 @@
                     <string>Pixel Index End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1627,7 +1587,7 @@
                     <string>5</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1637,7 +1597,7 @@
                     <string>Array Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1647,7 +1607,7 @@
                     <string>Missing</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1657,7 +1617,7 @@
                     <string>IP</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1667,7 +1627,7 @@
                     <string>7</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1677,7 +1637,7 @@
                     <string>3</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1687,7 +1647,7 @@
                     <string>2</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1697,7 +1657,7 @@
                     <string>Local Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1707,7 +1667,7 @@
                     <string>1</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1717,7 +1677,7 @@
                     <string>Channel Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1727,7 +1687,7 @@
                     <string>8</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1737,7 +1697,7 @@
                     <string>6</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -1747,7 +1707,7 @@
                     <string>4</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2375,10 +2335,10 @@
             <item row="2" column="0">
              <widget class="QFrame" name="t1_state_frame">
               <property name="frameShape">
-               <enum>QFrame::Box</enum>
+               <enum>QFrame::Shape::Box</enum>
               </property>
               <property name="frameShadow">
-               <enum>QFrame::Raised</enum>
+               <enum>QFrame::Shadow::Raised</enum>
               </property>
               <property name="lineWidth">
                <number>2</number>
@@ -2393,7 +2353,7 @@
                   <string>Telescope 1</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -2402,7 +2362,7 @@
                  <item>
                   <spacer name="t1_state_left_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -2425,7 +2385,7 @@
                  <item>
                   <spacer name="t1_state_right_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -2445,7 +2405,7 @@
                     <string>Channel End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2455,7 +2415,7 @@
                     <string>Pixel Index Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2465,7 +2425,7 @@
                     <string>Harvester</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2475,7 +2435,7 @@
                     <string>Pixel Index End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2485,7 +2445,7 @@
                     <string>5</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2495,7 +2455,7 @@
                     <string>Array Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2505,7 +2465,7 @@
                     <string>Missing</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2515,7 +2475,7 @@
                     <string>IP</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2525,7 +2485,7 @@
                     <string>7</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2535,7 +2495,7 @@
                     <string>3</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2545,7 +2505,7 @@
                     <string>2</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2555,7 +2515,7 @@
                     <string>Local Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2565,7 +2525,7 @@
                     <string>1</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2575,7 +2535,7 @@
                     <string>Channel Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2585,7 +2545,7 @@
                     <string>8</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2595,7 +2555,7 @@
                     <string>6</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -2605,7 +2565,7 @@
                     <string>4</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3242,7 +3202,7 @@
             <item row="4" column="0">
              <spacer name="verticalSpacer">
               <property name="orientation">
-               <enum>Qt::Vertical</enum>
+               <enum>Qt::Orientation::Vertical</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -3255,10 +3215,10 @@
             <item row="2" column="1">
              <widget class="QFrame" name="t2_state_frame">
               <property name="frameShape">
-               <enum>QFrame::Box</enum>
+               <enum>QFrame::Shape::Box</enum>
               </property>
               <property name="frameShadow">
-               <enum>QFrame::Raised</enum>
+               <enum>QFrame::Shadow::Raised</enum>
               </property>
               <property name="lineWidth">
                <number>2</number>
@@ -3270,7 +3230,7 @@
                   <string>Telescope 2</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -3279,7 +3239,7 @@
                  <item>
                   <spacer name="t2_state_left_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -3302,7 +3262,7 @@
                  <item>
                   <spacer name="t2_state_right_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -3322,7 +3282,7 @@
                     <string>Channel End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3332,7 +3292,7 @@
                     <string>Pixel Index Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3342,7 +3302,7 @@
                     <string>Harvester</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3352,7 +3312,7 @@
                     <string>Pixel Index End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3362,7 +3322,7 @@
                     <string>5</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3372,7 +3332,7 @@
                     <string>Array Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3382,7 +3342,7 @@
                     <string>Missing</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3392,7 +3352,7 @@
                     <string>IP</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3402,7 +3362,7 @@
                     <string>7</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3412,7 +3372,7 @@
                     <string>3</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3422,7 +3382,7 @@
                     <string>2</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3432,7 +3392,7 @@
                     <string>Local Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3442,7 +3402,7 @@
                     <string>1</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3452,7 +3412,7 @@
                     <string>Channel Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3462,7 +3422,7 @@
                     <string>8</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3472,7 +3432,7 @@
                     <string>6</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -3482,7 +3442,7 @@
                     <string>4</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4112,7 +4072,7 @@
               <item>
                <spacer name="state_edit_left_hspacer">
                 <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
+                 <enum>Qt::Orientation::Horizontal</enum>
                 </property>
                 <property name="sizeHint" stdset="0">
                  <size>
@@ -4157,10 +4117,10 @@
             <item row="3" column="1">
              <widget class="QFrame" name="t4_state_frame">
               <property name="frameShape">
-               <enum>QFrame::Box</enum>
+               <enum>QFrame::Shape::Box</enum>
               </property>
               <property name="frameShadow">
-               <enum>QFrame::Raised</enum>
+               <enum>QFrame::Shadow::Raised</enum>
               </property>
               <property name="lineWidth">
                <number>2</number>
@@ -4172,7 +4132,7 @@
                   <string>Telescope 4</string>
                  </property>
                  <property name="alignment">
-                  <set>Qt::AlignCenter</set>
+                  <set>Qt::AlignmentFlag::AlignCenter</set>
                  </property>
                 </widget>
                </item>
@@ -4181,7 +4141,7 @@
                  <item>
                   <spacer name="t4_state_left_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -4204,7 +4164,7 @@
                  <item>
                   <spacer name="t4_state_right_hspacer">
                    <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                    </property>
                    <property name="sizeHint" stdset="0">
                     <size>
@@ -4224,7 +4184,7 @@
                     <string>Channel End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4234,7 +4194,7 @@
                     <string>Pixel Index Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4244,7 +4204,7 @@
                     <string>Harvester</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4254,7 +4214,7 @@
                     <string>Pixel Index End</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4264,7 +4224,7 @@
                     <string>5</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4274,7 +4234,7 @@
                     <string>Array Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4284,7 +4244,7 @@
                     <string>Missing</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4294,7 +4254,7 @@
                     <string>IP</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4304,7 +4264,7 @@
                     <string>7</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4314,7 +4274,7 @@
                     <string>3</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4324,7 +4284,7 @@
                     <string>2</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4334,7 +4294,7 @@
                     <string>Local Position</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4344,7 +4304,7 @@
                     <string>1</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4354,7 +4314,7 @@
                     <string>Channel Start</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4364,7 +4324,7 @@
                     <string>8</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4374,7 +4334,7 @@
                     <string>6</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -4384,7 +4344,7 @@
                     <string>4</string>
                    </property>
                    <property name="alignment">
-                    <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                    </property>
                   </widget>
                  </item>
@@ -5012,7 +4972,7 @@
             <item row="2" column="2">
              <spacer name="horizontalSpacer">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -5032,160 +4992,280 @@
        <attribute name="title">
         <string>Test</string>
        </attribute>
-       <widget class="QCheckBox" name="debug_mode_check">
-        <property name="geometry">
-         <rect>
-          <x>470</x>
-          <y>220</y>
-          <width>671</width>
-          <height>30</height>
-         </rect>
-        </property>
-        <property name="toolTip">
-         <string>Enables the controls below. They bypass the checks that keep Start locked; populate dt force-enables Start until this is unchecked.</string>
-        </property>
-        <property name="text">
-         <string>Enable debug controls (bypass Start checks)</string>
-        </property>
-       </widget>
-       <widget class="QFrame" name="debug_controls_frame">
-        <property name="geometry">
-         <rect>
-          <x>470</x>
-          <y>260</y>
-          <width>671</width>
-          <height>700</height>
-         </rect>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout" name="verticalLayout">
-         <item>
-          <widget class="QPushButton" name="populate_dt">
-           <property name="text">
-            <string>populate dt</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="send_stop_button">
-           <property name="text">
-            <string>send stop</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton">
-           <property name="text">
-            <string>Send</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="wrtie_db">
-           <property name="text">
-            <string>write_db</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="test_button">
-           <property name="text">
-            <string>Dump postgres dict</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="sc_group">
-           <property name="title">
-            <string>send_command generate (dummy packets)</string>
-           </property>
-           <layout class="QGridLayout" name="sc_grid_layout">
-            <item row="0" column="0">
-             <widget class="QLabel" name="sc_max_packets_label">
-              <property name="text">
-               <string>Packets per harvester</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="1">
-             <widget class="QSpinBox" name="sc_max_packets_spin">
-              <property name="toolTip">
-               <string>Number of 308-byte packets sent to each present harvester in the loaded state.</string>
-              </property>
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>1000000000</number>
-              </property>
-              <property name="value">
-               <number>10000</number>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="sc_interval_us_label">
-              <property name="text">
-               <string>Interval between packets</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QSpinBox" name="sc_interval_us_spin">
-              <property name="toolTip">
-               <string>Time between packets to each harvester. 1000 µs is about 1 kHz per harvester.</string>
-              </property>
-              <property name="suffix">
-               <string> µs</string>
-              </property>
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>10000000</number>
-              </property>
-              <property name="value">
-               <number>1000</number>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QPushButton" name="sc_generate_button">
-              <property name="toolTip">
-               <string>Run server/bin/send_command generate against the harvester addresses of the loaded (Set) state.</string>
-              </property>
-              <property name="text">
-               <string>Generate</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="1">
-             <widget class="QPushButton" name="sc_kill_button">
-              <property name="toolTip">
-               <string>Stop a running send_command.</string>
-              </property>
-              <property name="text">
-               <string>Kill</string>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="0" colspan="2">
-             <widget class="QLabel" name="sc_status_label">
-              <property name="text">
-               <string>idle</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </widget>
+       <layout class="QHBoxLayout" name="test_tab_layout">
+        <item>
+         <layout class="QVBoxLayout" name="test_column_layout">
+          <item>
+           <widget class="QCheckBox" name="debug_mode_check">
+            <property name="toolTip">
+             <string>Enables the controls below. They bypass the checks that keep Start locked; Force-enable Start unlocks Start until this is unchecked.</string>
+            </property>
+            <property name="text">
+             <string>Enable debug controls (bypass Start checks)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="debug_controls_frame">
+            <property name="maximumSize">
+             <size>
+              <width>700</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::Shape::StyledPanel</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Shadow::Raised</enum>
+            </property>
+            <layout class="QVBoxLayout" name="debug_controls_layout">
+             <item>
+              <widget class="QGroupBox" name="run_override_group">
+               <property name="title">
+                <string>Run overrides</string>
+               </property>
+               <layout class="QGridLayout" name="run_override_grid_layout" columnstretch="0,1">
+                <item row="0" column="0">
+                 <widget class="QPushButton" name="force_start_button">
+                  <property name="minimumSize">
+                   <size>
+                    <width>160</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="toolTip">
+                   <string>Unlock Start whatever the checks say, until debug controls are switched off. Also copies the FADC window selection into the run window field.</string>
+                  </property>
+                  <property name="text">
+                   <string>Force-enable Start</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QLabel" name="force_start_hint_label">
+                  <property name="text">
+                   <string>Unlock Start even though some checks fail.</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QPushButton" name="write_db_button">
+                  <property name="minimumSize">
+                   <size>
+                    <width>160</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="toolTip">
+                   <string>Insert the current run parameters into tblrun_info. Only for when the automatic write at the end of a run failed (e.g. the DB was down); it fails if a row for this run ID already exists.</string>
+                  </property>
+                  <property name="text">
+                   <string>Write run to DB</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QLabel" name="write_db_hint_label">
+                  <property name="text">
+                   <string>Insert this run's row by hand if the end-of-run write failed.</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QPushButton" name="fadc_override_button">
+                  <property name="minimumSize">
+                   <size>
+                    <width>160</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="toolTip">
+                   <string>Fills the run window (unlocking Start) and moves the Control-tab FADC selection to match, without running set_variance over SSH. Only use it when the crates already have this window, e.g. after a GUI restart.</string>
+                  </property>
+                  <property name="text">
+                   <string>Use FADC window</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <layout class="QHBoxLayout" name="fadc_override_h_layout">
+                  <item>
+                   <widget class="QComboBox" name="fadc_override_combo"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="fadc_override_hint_label">
+                    <property name="text">
+                     <string>Record the window as already set on the crates; set_variance is not run.</string>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="diagnostics_group">
+               <property name="title">
+                <string>Diagnostics</string>
+               </property>
+               <layout class="QGridLayout" name="diagnostics_grid_layout" columnstretch="0,1">
+                <item row="0" column="0">
+                 <widget class="QPushButton" name="log_run_params_button">
+                  <property name="minimumSize">
+                   <size>
+                    <width>160</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="toolTip">
+                   <string>Write every run parameter (VO_db_params) and whether it is filled to the log.</string>
+                  </property>
+                  <property name="text">
+                   <string>Log run parameters</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QLabel" name="log_run_params_hint_label">
+                  <property name="text">
+                   <string>Log the run parameters and which are filled.</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="sc_group">
+               <property name="title">
+                <string>send_command generate (dummy packets)</string>
+               </property>
+               <layout class="QGridLayout" name="sc_grid_layout">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="sc_max_packets_label">
+                  <property name="text">
+                   <string>Packets per harvester</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QSpinBox" name="sc_max_packets_spin">
+                  <property name="toolTip">
+                   <string>Number of 308-byte packets sent to each present harvester in the loaded state.</string>
+                  </property>
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>1000000000</number>
+                  </property>
+                  <property name="value">
+                   <number>10000</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="sc_interval_us_label">
+                  <property name="text">
+                   <string>Interval between packets</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QSpinBox" name="sc_interval_us_spin">
+                  <property name="toolTip">
+                   <string>Time between packets to each harvester. 1000 µs is about 1 kHz per harvester.</string>
+                  </property>
+                  <property name="suffix">
+                   <string> µs</string>
+                  </property>
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>10000000</number>
+                  </property>
+                  <property name="value">
+                   <number>1000</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QPushButton" name="sc_generate_button">
+                  <property name="toolTip">
+                   <string>Run server/bin/send_command generate against the harvester addresses of the loaded (Set) state.</string>
+                  </property>
+                  <property name="text">
+                   <string>Generate</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QPushButton" name="sc_kill_button">
+                  <property name="toolTip">
+                   <string>Stop a running send_command.</string>
+                  </property>
+                  <property name="text">
+                   <string>Kill</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0" colspan="2">
+                 <widget class="QLabel" name="sc_status_label">
+                  <property name="text">
+                   <string>idle</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="test_column_vspacer">
+            <property name="orientation">
+             <enum>Qt::Orientation::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="test_tab_hspacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>
@@ -5197,7 +5277,7 @@
      <x>0</x>
      <y>0</y>
      <width>1735</width>
-     <height>20</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

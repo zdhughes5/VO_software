@@ -8,8 +8,13 @@ server with startRunCmd.
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import json
 import logging
+import os
 
 from qt_logging import logger
+
+# Where File > Load state file opens, resolved from this file rather than the CWD.
+DEFAULT_STATE_FILE = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'server', 'internal', 'state.json'))
 
 class StateEditorMixin:
     """state.json loading and in-place editing.
@@ -83,7 +88,11 @@ class StateEditorMixin:
 
     def load_state_file(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load State File", "", "JSON Files (*.json);;All Files (*)")
+        # Start at server/internal/state.json (pre-selected) wherever the GUI was launched from.
+        start = DEFAULT_STATE_FILE
+        if not os.path.exists(start):
+            start = os.path.dirname(start) if os.path.isdir(os.path.dirname(start)) else ""
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load State File", start, "JSON Files (*.json);;All Files (*)")
         if not file_name:
             return
         try:
