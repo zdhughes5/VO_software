@@ -71,10 +71,10 @@ class CameraDisplayMixin:
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)
         self.colors2 = np.array([QBrush(QColor(*i)) for i in self.colors])
         
-        self.pixelTimeSeriesData1 = np.zeros(1000)
-        self.pixelTimeSeriesData2 = np.zeros(1000)
-        self.pixelTimeSeriesData3 = np.zeros(1000)
-        self.pixelTimeSeriesData4 = np.zeros(1000)
+        self.pixelTimeSeriesData1 = np.zeros(1000) + 100
+        self.pixelTimeSeriesData2 = np.zeros(1000) + 100
+        self.pixelTimeSeriesData3 = np.zeros(1000) + 100
+        self.pixelTimeSeriesData4 = np.zeros(1000) + 100
         self.pixelTimeSeriesDataCurve1 = pg.PlotCurveItem(self.pixelTimeSeriesData1, pen=(255,0,0), antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve2 = pg.PlotCurveItem(self.pixelTimeSeriesData2, antialias=False, skipFiniteCheck=True)
         self.pixelTimeSeriesDataCurve3 = pg.PlotCurveItem(self.pixelTimeSeriesData3, pen=(0,255,0), antialias=False, skipFiniteCheck=True)
@@ -261,7 +261,16 @@ class CameraDisplayMixin:
 
     def clear_time_series_data(self):
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
-        # Reset the time series data to zero
+        # Reset the time series data to initial value
+        # Harvester has an offset of 100 d.c.
+        if self.pixelTimeSeriesData1[-1] == 0:
+            self.pixelTimeSeriesData1[-1] = 100
+        if self.pixelTimeSeriesData2[-1] == 0:
+            self.pixelTimeSeriesData2[-1] = 100
+        if self.pixelTimeSeriesData3[-1] == 0:
+            self.pixelTimeSeriesData3[-1] = 100
+        if self.pixelTimeSeriesData4[-1] == 0:
+            self.pixelTimeSeriesData4[-1] = 100
         self.pixelTimeSeriesData1 = np.ones(1000)*self.pixelTimeSeriesData1[-1]
         self.pixelTimeSeriesData2 = np.ones(1000)*self.pixelTimeSeriesData2[-1]
         self.pixelTimeSeriesData3 = np.ones(1000)*self.pixelTimeSeriesData3[-1]
