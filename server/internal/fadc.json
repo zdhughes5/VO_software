@@ -4,7 +4,7 @@
             "telescope": 1,
             "missing": false,
             "crates": [
-                {"position": 1, "missing": false, "username": "vdaq", "hostname": "vdaq-fadc1-t1", "ip": "107.0.10.102", "binary": "/home/vdaq/ped_var/washu-fadc/set_variance/set_variance", "commandOptions": "-XY -v"},
+                {"position": 1, "missing": false, "username": "vdaq", "hostname": "vdaq-fadc1-t1", "ip": "107.0.10.102", "binary": "/home/vdaq/ped_var/washu-fadc/set_variance/set_variance", "commandOptions": "-XY"},
                 {"position": 2, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30002", "binary": "/home/vdaq/VO/set_variance/set_variance", "commandOptions": "XY -o ConnectTimeout=1 -o PubkeyAcceptedAlgorithms=+ssh-rsa -o Ciphers=+aes128-cbc -o HostKeyAlgorithms=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group-exchange-sha1"},
                 {"position": 3, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30003", "binary": "/home/vdaq/VO/set_variance/set_variance", "commandOptions": "-XY -v -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1 -o RequiredRSASize=1024 -o CheckHostIP=no"},
                 {"position": 4, "missing": true, "username": "vdaq", "hostname": "fadc-testcrate.vts", "ip": "127.0.0.1:30004", "binary": "/home/vdaq/VO/set_variance/set_variance", "commandOptions": "XY -o -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -o KexAlgorithms=+diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1 -o RequiredRSASize=1024 -o CheckHostIP=no"}
