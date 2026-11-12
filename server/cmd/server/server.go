@@ -669,7 +669,10 @@ func startHarvesterListener(udpHarvesterConn *net.UDPConn, thisHarvester harvest
 			}
 			packets++
 			_, _ = outputFile.Write(buf[:n])
-			if sendInterval > 0 && extractEventNumber(buf, true)%sendInterval == 0 { // Maybe change this to just i%sendInterval
+			// The event number is big-endian on the wire. Reading it
+			// little-endian made the GUI feed stop dead once the board
+			// counter passed 2^24 with an even sendInterval (run 729).
+			if sendInterval > 0 && extractEventNumber(buf, false)%sendInterval == 0 {
 				copy(bufIn[:], buf[:308])
 				select {
 				case eventBuilderChannel <- eventBuilderData{Source: thisHarvester, Data: bufIn}:

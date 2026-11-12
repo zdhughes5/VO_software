@@ -260,7 +260,8 @@ func sendDataToIP(ip string, harvester int, maxPackets int, packetInterval int) 
 		if j > maxPackets {
 			break
 		}
-		binary.LittleEndian.PutUint32(iterationBytes, uint32(j))
+		// Big-endian, as the harvester sends it (see scripts/event_reader.py).
+		binary.BigEndian.PutUint32(iterationBytes, uint32(j))
 		copy(buf[:4], iterationBytes)
 
 		// Fill the last 280 bytes with random values
