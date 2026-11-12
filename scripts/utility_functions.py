@@ -1,11 +1,12 @@
 import sys
 import struct
 import pandas as pd
-import sys
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
+
+from event_reader import EVENT_SIZE, EventFile, parse_event
 
 class DataProcessor:
     def __init__(self, filename):
@@ -13,31 +14,7 @@ class DataProcessor:
         self.df = self.load_data_as_dataframe()
 
     def load_data_as_dataframe(self):
-        events = read_binary_file(self.filename)
-        data_list = []
-
-        for event in events:
-            data = extract_data(event)
-            event_number = data['number']
-            ch_mask_bits = data['ch_mask_bits']
-            
-            for channel in range(70):
-                channel_mask = (ch_mask_bits >> (69 - channel)) & 1
-                data_list.append({
-                    'event_number': event_number,
-                    'channel': channel + 1,
-                    'timestamp': data['timestamp'],
-                    'extra_reg1': data['extra_reg1'],
-                    'extra_reg2': data['extra_reg2'],
-                    'extra_reg3': data['extra_reg3'],
-                    'window_size': data['window_size'],
-                    'channel_mask': channel_mask,
-                    'variance': data['variances'][channel]
-                })
-
-        df = pd.DataFrame(data_list)
-        df.set_index(['event_number', 'channel'], inplace=True)
-        return df
+        return EventFile(self.filename).to_dataframe(long=True)
 
     def get_dataframe(self):
         return self.df
@@ -454,22 +431,28 @@ class colors():
                 inString = str(self.UNDERLINE+str(inString)+self.ENDC)
                 return inString
 
-def read_binary_file(filename):
-    events = []
-    event_size = 308  # Size of each event in bytes
+def read_events_from_binary_file(filename, chunk_size=EVENT_SIZE):
+    """Yield each raw `chunk_size`-byte event from a run file (trailing partial event dropped).
 
+    For parsed data, prefer event_reader.EventFile(filename).
+    """
     try:
         with open(filename, 'rb') as file:
             while True:
-                event = file.read(event_size)
-                if len(event) < event_size:
-                    break  # End of file or incomplete event
-                events.append(event)
+                chunk = file.read(chunk_size)
+                if len(chunk) < chunk_size:
+                    break  # End of file or incomplete chunk
+                yield chunk
     except IOError as e:
         print(f"Error reading file {filename}: {e}")
         sys.exit(1)
 
-    return events
+# Older names for the same generator.
+read_binary_file_in_chunks = read_events_from_binary_file
+
+def read_binary_file(filename):
+    """Return a list of the raw 308-byte events in a run file."""
+    return list(read_events_from_binary_file(filename))
 
 def format_binary_with_spaces(binary_str):
     # Group the last 2 bits separately and then group the rest in 4-bit chunks
@@ -546,141 +529,68 @@ def dump_events(filename):
                 print_hex(events[event_index], color_methods, default_color)
 
 def convert_to_decimal(word):
-    # Extract the integer part (first 16 bits)
-    integer_part = word >> 16
-
-    # Extract the fractional part (last 16 bits)
-    fractional_part = word & 0xFFFF
-
-    # Convert the fractional part to decimal
-    fractional_decimal = 0.0
-    for i in range(16):
-        if fractional_part & (1 << (15 - i)):
-            fractional_decimal += 2 ** (-1 - i)
-
-    # Combine the integer and fractional parts
-    return integer_part + fractional_decimal
-
-def read_events_from_binary_file(filename, chunk_size=308):
-    try:
-        with open(filename, 'rb') as file:
-            while True:
-                chunk = file.read(chunk_size)
-                if len(chunk) < chunk_size:
-                    break  # End of file or incomplete chunk
-                yield chunk
-    except IOError as e:
-        print(f"Error reading file {filename}: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        sys.exit(1)
-    
+    """Convert an unsigned 16.16 fixed-point word to float."""
+    return word / 65536.0
 
 def parse_data_from_event(chunk):
-    # Offsets for the required data
-    event_number_offset = 0
-    timestamp_seconds_offset = 4
-    timestamp_nanoseconds_offset = 8
-    extra_reg_offset = 12
-    window_size_offset = 18
-    ch_mask_bits_offset = 20
-    variance_offset = 0x1c
+    """Parse one 308-byte event. Keys: event_number, timestamp, extra_reg1-3,
+    window_size, ch_mask_bits (70-bit int), variances (list of 70 floats)."""
+    return parse_event(chunk)
 
-    # Extract the 32-bit event number (4 bytes) at offset 0
-    event_number = struct.unpack_from('>I', chunk, event_number_offset)[0]
+def extract_data(event):
+    """Same as parse_data_from_event, but the event number is under the key 'number'."""
+    data = parse_event(event)
+    return {'number': data.pop('event_number'), **data}
 
-    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
-    timestamp_seconds = struct.unpack_from('>I', chunk, timestamp_seconds_offset)[0]
+extract_data_from_chunk = extract_data
 
-    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
-    timestamp_nanoseconds = struct.unpack_from('>I', chunk, timestamp_nanoseconds_offset)[0]
-
-    # Combine the seconds and nanoseconds to form a complete timestamp
-    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
-
-    # Extract the extra registers (6 bytes) at offset 12
-    extra_reg1 = struct.unpack_from('>H', chunk, extra_reg_offset)[0]
-    extra_reg2 = struct.unpack_from('>H', chunk, extra_reg_offset + 2)[0]
-    extra_reg3 = struct.unpack_from('>H', chunk, extra_reg_offset + 4)[0]
-
-    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
-    window_size_and_mask = struct.unpack_from('>H', chunk, window_size_offset)[0]
-    window_size = window_size_and_mask >> 13
-    ch_mask_bits_high = window_size_and_mask & 0x3F
-
-    # Extract the 64-bit channel mask at offset 20
-    ch_mask_bits_low = struct.unpack_from('>Q', chunk, ch_mask_bits_offset)[0]
-
-    # Combine the 6 bits with the 64-bit number to form the full channel mask
-    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
-
-    # Extract the variances (280 bytes) starting at offset 28
-    variances = []
-    for i in range(70):
-        variance_word = struct.unpack_from('>I', chunk, variance_offset + i * 4)[0]
-        variances.append(convert_to_decimal(variance_word))
-
-    return {
-        'event_number': event_number,
-        'timestamp': timestamp,
-        'extra_reg1': extra_reg1,
-        'extra_reg2': extra_reg2,
-        'extra_reg3': extra_reg3,
-        'window_size': window_size,
-        'ch_mask_bits': ch_mask_bits,
-        'variances': variances
-    }
+def _write_fits(filename, number, timestamp, extra_reg1, extra_reg2, extra_reg3,
+                window_size, ch_mask_low, ch_mask_high, variances):
+    # ch_mask_bits is 70-bit, so it is stored as low 64 bits + high 6 bits
+    cols = fits.ColDefs([
+        fits.Column(name='number', format='K', array=np.asarray(number, dtype=np.uint64)),
+        fits.Column(name='timestamp', format='D', array=np.asarray(timestamp, dtype=np.float64)),
+        fits.Column(name='extra_reg1', format='I', array=np.asarray(extra_reg1, dtype=np.uint32)),
+        fits.Column(name='extra_reg2', format='I', array=np.asarray(extra_reg2, dtype=np.uint32)),
+        fits.Column(name='extra_reg3', format='I', array=np.asarray(extra_reg3, dtype=np.uint32)),
+        fits.Column(name='window_size', format='I', array=np.asarray(window_size, dtype=np.uint32)),
+        fits.Column(name='ch_mask_low', format='K', array=np.asarray(ch_mask_low, dtype=np.uint64)),
+        fits.Column(name='ch_mask_high', format='B', array=np.asarray(ch_mask_high, dtype=np.uint8)),
+        fits.Column(name='variances', format='70D', array=np.asarray(variances, dtype=np.float64).reshape(-1, 70)),
+    ])
+    fits.BinTableHDU.from_columns(cols).writeto(filename, overwrite=True)
 
 def save_to_fits(data, filename):
-    # Convert the data to a FITS table
-    # Note: ch_mask_bits is 70-bit, so we split it into two 64-bit parts
-    col1 = fits.Column(name='number', format='K', array=np.array([d['number'] for d in data], dtype=np.uint64))
-    col2 = fits.Column(name='timestamp', format='D', array=np.array([d['timestamp'] for d in data], dtype=np.float64))
-    col3 = fits.Column(name='extra_reg1', format='I', array=np.array([d['extra_reg1'] for d in data], dtype=np.uint32))
-    col4 = fits.Column(name='extra_reg2', format='I', array=np.array([d['extra_reg2'] for d in data], dtype=np.uint32))
-    col5 = fits.Column(name='extra_reg3', format='I', array=np.array([d['extra_reg3'] for d in data], dtype=np.uint32))
-    col6 = fits.Column(name='window_size', format='I', array=np.array([d['window_size'] for d in data], dtype=np.uint32))
-    # Split 70-bit channel mask into low 64 bits and high 6 bits
-    col7 = fits.Column(name='ch_mask_low', format='K', array=np.array([d['ch_mask_bits'] & 0xFFFFFFFFFFFFFFFF for d in data], dtype=np.uint64))
-    col8 = fits.Column(name='ch_mask_high', format='B', array=np.array([d['ch_mask_bits'] >> 64 for d in data], dtype=np.uint8))
-    col9 = fits.Column(name='variances', format='70D', array=np.array([d['variances'] for d in data], dtype=np.float64))
-
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9])
-    hdu = fits.BinTableHDU.from_columns(cols)
-
-    # Write the FITS file
-    hdu.writeto(filename, overwrite=True)
+    """Write a list of parsed-event dicts (from extract_data or parse_data_from_event) to FITS."""
+    def number(d):
+        return d['number'] if 'number' in d else d['event_number']
+    _write_fits(
+        filename,
+        number=[number(d) for d in data],
+        timestamp=[d['timestamp'] for d in data],
+        extra_reg1=[d['extra_reg1'] for d in data],
+        extra_reg2=[d['extra_reg2'] for d in data],
+        extra_reg3=[d['extra_reg3'] for d in data],
+        window_size=[d['window_size'] for d in data],
+        ch_mask_low=[d['ch_mask_bits'] & 0xFFFFFFFFFFFFFFFF for d in data],
+        ch_mask_high=[d['ch_mask_bits'] >> 64 for d in data],
+        variances=[d['variances'] for d in data],
+    )
 
 def process_and_save_to_fits(binary_filename, fits_filename, max_events=None):
-    data = []
-    for i, chunk in enumerate(read_events_from_binary_file(binary_filename)):
-        if max_events is not None and i >= max_events:
-            break
-        parsed_data = parse_data_from_event(chunk)
-        data.append(parsed_data)
-    
-    save_to_fits(data, fits_filename)
-
-def save_to_fits_incrementally(data, filename):
-    # Convert the data to a FITS table
-    # Note: ch_mask_bits is 70-bit, so we split it into two 64-bit parts
-    col1 = fits.Column(name='number', format='K', array=np.array([d['number'] for d in data], dtype=np.uint64))
-    col2 = fits.Column(name='timestamp', format='D', array=np.array([d['timestamp'] for d in data], dtype=np.float64))
-    col3 = fits.Column(name='extra_reg1', format='I', array=np.array([d['extra_reg1'] for d in data], dtype=np.uint32))
-    col4 = fits.Column(name='extra_reg2', format='I', array=np.array([d['extra_reg2'] for d in data], dtype=np.uint32))
-    col5 = fits.Column(name='extra_reg3', format='I', array=np.array([d['extra_reg3'] for d in data], dtype=np.uint32))
-    col6 = fits.Column(name='window_size', format='I', array=np.array([d['window_size'] for d in data], dtype=np.uint32))
-    # Split 70-bit channel mask into low 64 bits and high 6 bits
-    col7 = fits.Column(name='ch_mask_low', format='K', array=np.array([d['ch_mask_bits'] & 0xFFFFFFFFFFFFFFFF for d in data], dtype=np.uint64))
-    col8 = fits.Column(name='ch_mask_high', format='B', array=np.array([d['ch_mask_bits'] >> 64 for d in data], dtype=np.uint8))
-    col9 = fits.Column(name='variances', format='70D', array=np.array([d['variances'] for d in data], dtype=np.float64))
-
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9])
-    hdu = fits.BinTableHDU.from_columns(cols)
-
-    # Write the FITS file
-    hdu.writeto(filename, overwrite=True)
+    ev = EventFile(binary_filename, max_events=max_events)
+    _write_fits(
+        fits_filename,
+        number=ev.event_number,
+        timestamp=ev.timestamp,
+        extra_reg1=ev.extra_reg1,
+        extra_reg2=ev.extra_reg2,
+        extra_reg3=ev.extra_reg3,
+        window_size=ev.window_size,
+        ch_mask_low=ev.ch_mask_low,
+        ch_mask_high=ev.ch_mask_high,
+        variances=ev.variances,
+    )
 
 def process_and_save_to_fits_incrementally(binary_filename, fits_filename, max_events=None, batch_size=1000):
     """
@@ -785,126 +695,10 @@ def reconstruct_channel_mask(ch_mask_low, ch_mask_high):
     --------
     int or array : The reconstructed 70-bit channel mask
     """
-    # Convert to Python int to allow arbitrary precision arithmetic
+    # Convert to Python int to allow arbitrary precision arithmetic.
+    # FITS 'K' columns read back as signed int64, so mask to recover the unsigned 64 bits.
+    low_mask = (1 << 64) - 1
     if isinstance(ch_mask_low, np.ndarray):
-        return np.array([(int(high) << 64) | int(low) for low, high in zip(ch_mask_low, ch_mask_high)])
+        return np.array([(int(high) << 64) | (int(low) & low_mask) for low, high in zip(ch_mask_low, ch_mask_high)])
     else:
-        return (int(ch_mask_high) << 64) | int(ch_mask_low)
-
-def extract_data(event):
-    # Offsets for the required data
-    number_offset = 0
-    timestamp_seconds_offset = 4
-    timestamp_nanoseconds_offset = 8
-    extra_reg_offset = 12
-    window_size_offset = 18
-    ch_mask_bits_offset = 20
-    variance_offset = 0x1c
-
-    # Extract the 32-bit number (4 bytes) at offset 0
-    number = struct.unpack_from('>I', event, number_offset)[0]
-
-    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
-    timestamp_seconds = struct.unpack_from('>I', event, timestamp_seconds_offset)[0]
-
-    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
-    timestamp_nanoseconds = struct.unpack_from('>I', event, timestamp_nanoseconds_offset)[0]
-
-    # Combine the seconds and nanoseconds to form a complete timestamp
-    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
-
-    # Extract the extra registers (6 bytes) at offset 12
-    extra_reg1 = struct.unpack_from('>H', event, extra_reg_offset)[0]
-    extra_reg2 = struct.unpack_from('>H', event, extra_reg_offset + 2)[0]
-    extra_reg3 = struct.unpack_from('>H', event, extra_reg_offset + 4)[0]
-
-    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
-    window_size_and_mask = struct.unpack_from('>H', event, window_size_offset)[0]
-    window_size = window_size_and_mask >> 13
-    ch_mask_bits_high = window_size_and_mask & 0x3F
-
-    # Extract the 64-bit channel mask at offset 20
-    ch_mask_bits_low = struct.unpack_from('>Q', event, ch_mask_bits_offset)[0]
-
-    # Combine the 6 bits with the 64-bit number to form the full channel mask
-    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
-
-    # Extract the variances (280 bytes) starting at offset 28
-    variances = []
-    for i in range(70):
-        variance_word = struct.unpack_from('>I', event, variance_offset + i * 4)[0]
-        variances.append(convert_to_decimal(variance_word))
-
-    return {
-        'number': number,
-        'timestamp': timestamp,
-        'extra_reg1': extra_reg1,
-        'extra_reg2': extra_reg2,
-        'extra_reg3': extra_reg3,
-        'window_size': window_size,
-        'ch_mask_bits': ch_mask_bits,
-        'variances': variances
-    }
-
-def read_binary_file_in_chunks(filename, chunk_size=308):
-    with open(filename, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            if len(chunk) < chunk_size:
-                break  # End of file or incomplete chunk
-            yield chunk
-
-def extract_data_from_chunk(chunk):
-    # Offsets for the required data
-    number_offset = 0
-    timestamp_seconds_offset = 4
-    timestamp_nanoseconds_offset = 8
-    extra_reg_offset = 12
-    window_size_offset = 18
-    ch_mask_bits_offset = 20
-    variance_offset = 0x1c
-
-    # Extract the 32-bit number (4 bytes) at offset 0
-    number = struct.unpack_from('>I', chunk, number_offset)[0]
-
-    # Extract the UNIX timestamp seconds (4 bytes) at offset 4
-    timestamp_seconds = struct.unpack_from('>I', chunk, timestamp_seconds_offset)[0]
-
-    # Extract the UNIX nanosecond timestamp (4 bytes) at offset 8
-    timestamp_nanoseconds = struct.unpack_from('>I', chunk, timestamp_nanoseconds_offset)[0]
-
-    # Combine the seconds and nanoseconds to form a complete timestamp
-    timestamp = timestamp_seconds + timestamp_nanoseconds * 1e-9
-
-    # Extract the extra registers (6 bytes) at offset 12
-    extra_reg1 = struct.unpack_from('>H', chunk, extra_reg_offset)[0]
-    extra_reg2 = struct.unpack_from('>H', chunk, extra_reg_offset + 2)[0]
-    extra_reg3 = struct.unpack_from('>H', chunk, extra_reg_offset + 4)[0]
-
-    # Extract the window size (3 bits) and part of the channel mask (13 bits) at offset 18
-    window_size_and_mask = struct.unpack_from('>H', chunk, window_size_offset)[0]
-    window_size = window_size_and_mask >> 13
-    ch_mask_bits_high = window_size_and_mask & 0x3F
-
-    # Extract the 64-bit channel mask at offset 20
-    ch_mask_bits_low = struct.unpack_from('>Q', chunk, ch_mask_bits_offset)[0]
-
-    # Combine the 6 bits with the 64-bit number to form the full channel mask
-    ch_mask_bits = (ch_mask_bits_high << 64) | ch_mask_bits_low
-
-    # Extract the variances (280 bytes) starting at offset 28
-    variances = []
-    for i in range(70):
-        variance_word = struct.unpack_from('>I', chunk, variance_offset + i * 4)[0]
-        variances.append(convert_to_decimal(variance_word))
-
-    return {
-        'number': number,
-        'timestamp': timestamp,
-        'extra_reg1': extra_reg1,
-        'extra_reg2': extra_reg2,
-        'extra_reg3': extra_reg3,
-        'window_size': window_size,
-        'ch_mask_bits': ch_mask_bits,
-        'variances': variances
-    }
+        return (int(ch_mask_high) << 64) | (int(ch_mask_low) & low_mask)
