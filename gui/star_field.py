@@ -17,6 +17,11 @@ What does need care is the sign of y::
 
     x_cam = +delta_az        y_cam = -delta_alt
 
+(x is now negated by ``CAMERA_X_SIGN``, set 2026-11-11 to match the other
+VERITAS readouts; see that constant and
+``docs/2026-11-11-star-overlay-pointing.md``. The rest of this section
+describes the Eventdisplay reference, which has x = +delta_az.)
+
 That is Eventdisplay's convention, and ``trueLocations_VERITAS.dat`` is
 expressed in it. Both halves were verified against the Eventdisplay tree:
 
@@ -48,6 +53,13 @@ from astropy.coordinates import SkyCoord
 # Eventdisplay flips the elevation axis when forming camera coordinates
 # (VSkyCoordinatesUtilities.cpp:238). This single sign is the whole bug fix.
 CAMERA_Y_SIGN = -1.0
+
+# Star x sign. Eventdisplay's convention is +1 (x along increasing azimuth).
+# Set to -1 on 2026-11-11: with corrected pointing, the star fields matched the
+# other VERITAS telescope readouts except mirrored left-right. Only the stars
+# flip; the pixel map does not, so this changes which pixel a star lands on.
+# TO FLIP BACK: set this to +1.0. Nothing else needs to change.
+CAMERA_X_SIGN = -1.0
 
 # Slightly larger than the camera's 1.725 deg corner radius, so stars just
 # outside the outermost pixels still show up at the edge of the display.
@@ -218,12 +230,13 @@ def altaz_to_camera(tel_alt_deg, tel_az_deg, star_alt_deg, star_az_deg):
     # Component along the telescope's horizontal pointing direction.
     along_horizon = np.sin(tel_az) * cx + np.cos(tel_az) * cy
 
-    # x basis is d(pointing)/d(az), i.e. increasing azimuth.
+    # x basis is d(pointing)/d(az), i.e. increasing azimuth, then signed --
+    # see CAMERA_X_SIGN.
     x = (np.cos(tel_az) * cx - np.sin(tel_az) * cy) * _RAD_TO_DEG
     # y basis is increasing elevation, then flipped -- see CAMERA_Y_SIGN.
     y = (-np.sin(tel_el) * along_horizon + np.cos(tel_el) * cz) * _RAD_TO_DEG
 
-    return x, CAMERA_Y_SIGN * y
+    return CAMERA_X_SIGN * x, CAMERA_Y_SIGN * y
 
 
 def stars_in_fov(catalog, pointing_altaz, fov_radius_deg=FOV_RADIUS_DEG,
@@ -287,6 +300,40 @@ def marker_sizes(vmag, brightest=0.0, faintest=9.0, size_max=22.0, size_min=7.0)
     v = np.clip(np.asarray(vmag, dtype=float), brightest, faintest)
     frac = (v - brightest) / max(faintest - brightest, 1e-9)
     return size_max - frac * (size_max - size_min)
+
+
+TELESCOPE_POSITIONS_FILE = 'veritas_positions/telescope_positions.txt'
+TELESCOPES = ('t1', 't2', 't3', 't4')
+
+
+def load_telescope_locations(path=TELESCOPE_POSITIONS_FILE, fallback=None):
+    """Per-telescope site locations from the GPS survey file.
+
+    Returns ``({'t1': EarthLocation, ...}, missing)`` where ``missing`` lists
+    the telescopes that fell back to ``fallback`` because the file or their
+    row was absent. The caller decides how to report that.
+
+    For stars this is a small refinement: moving a telescope ~300 m from the
+    old shared basecamp position shifts stars by <= 0.004 deg (~2% of a pixel).
+    """
+    from astropy.coordinates import EarthLocation
+
+    found = {}
+    try:
+        with open(path, 'r') as f:
+            for line in f:
+                p = line.split()
+                if not p or p[0].startswith('#'):
+                    continue
+                found[p[0].lower()] = EarthLocation(
+                    lat=float(p[3]) * u.deg, lon=float(p[4]) * u.deg,
+                    height=float(p[5]) * u.m)
+    except OSError:
+        pass
+
+    missing = [t for t in TELESCOPES if t not in found]
+    locations = {t: found.get(t, fallback) for t in TELESCOPES}
+    return locations, missing
 
 
 def load_pixel_layout(path='trueLocations_VERITAS.dat'):

@@ -62,16 +62,19 @@ def query_last_pointing(queue: Queue, db_config: dict, command_queue: Queue, sta
             # timestamp comes along so the star overlay can place stars at the
             # time the pointing was actually measured rather than at the time
             # the row was consumed, which lags by up to the poll interval.
-            queries = {
-                't1': 'SELECT timestamp, elevation_raw, azimuth_raw FROM tblPositioner_Telescope0_Status ORDER BY timestamp DESC LIMIT 1',
-                't2': 'SELECT timestamp, elevation_raw, azimuth_raw FROM tblPositioner_Telescope1_Status ORDER BY timestamp DESC LIMIT 1',
-                't3': 'SELECT timestamp, elevation_raw, azimuth_raw FROM tblPositioner_Telescope2_Status ORDER BY timestamp DESC LIMIT 1',
-                't4': 'SELECT timestamp, elevation_raw, azimuth_raw FROM tblPositioner_Telescope3_Status ORDER BY timestamp DESC LIMIT 1'
-            }
-            for telescope, query in queries.items():
-                crs.execute(query)
+            #
+            # *_meas is the pointing-model-corrected direction and is what the
+            # overlay must use. *_raw is the bare encoder reading: on
+            # 2026-11-12 it was 0.6-6.4 deg off the source while *_meas was
+            # within 5 arcsec on all four telescopes. *_raw is kept only for
+            # the diagnostic printout. See docs/2026-11-11-star-overlay-pointing.md.
+            columns = ('timestamp', 'mode', 'elevation_meas', 'azimuth_meas',
+                       'elevation_raw', 'azimuth_raw')
+            for i, telescope in enumerate(('t1', 't2', 't3', 't4')):
+                crs.execute(f"SELECT {', '.join(columns)} FROM tblPositioner_Telescope{i}_Status "
+                            "ORDER BY timestamp DESC LIMIT 1")
                 res = crs.fetchone()
-                vpm[telescope] = {'timestamp': res['timestamp'], 'elevation_raw': res['elevation_raw'], 'azimuth_raw': res['azimuth_raw']}
+                vpm[telescope] = {key: res[key] for key in columns}
             crs.close()
 
             if not queue.full():

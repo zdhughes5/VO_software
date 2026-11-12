@@ -249,7 +249,7 @@ class StarOverlayMixin:
         extra = {'qThreadName': QtCore.QThread.currentThread().objectName() }
         print_string = '\n'
         for key, value in vpm.items():
-            print_string += f"Telescope {key} - Elevation: {value['elevation_raw']}, Azimuth: {value['azimuth_raw']}\n"
+            print_string += f"Telescope {key} - Elevation: {value['elevation_meas']}, Azimuth: {value['azimuth_meas']}\n"
         #logger.log(logging.INFO, print_string, extra=extra)
 
     def printPointing(self):
@@ -273,9 +273,14 @@ class StarOverlayMixin:
                 print_string += f"{telescope.upper()}: no data\n"
                 continue
 
-            az = Angle(row['azimuth_raw']*u.rad).wrap_at(360*u.deg)
-            alt = Angle(row['elevation_raw']*u.rad)
-            print_string += f"{telescope.upper()}: {format_sexagesimal(az)}  {format_sexagesimal(alt)}\n"
+            # The corrected pointing the overlay uses, then the bare encoder
+            # reading for diagnostics -- they differ by up to several degrees.
+            az = Angle(row['azimuth_meas']*u.rad).wrap_at(360*u.deg)
+            alt = Angle(row['elevation_meas']*u.rad)
+            print_string += f"{telescope.upper()}: {format_sexagesimal(az)}  {format_sexagesimal(alt)}  ({row.get('mode', '?')})\n"
+            raw_az = Angle(row['azimuth_raw']*u.rad).wrap_at(360*u.deg)
+            raw_alt = Angle(row['elevation_raw']*u.rad)
+            print_string += f"    encoder raw: {format_sexagesimal(raw_az)}  {format_sexagesimal(raw_alt)}\n"
 
             # The positioner only writes status while it is moving, so a parked
             # telescope's last row can be hours old. Say so -- pasting a stale

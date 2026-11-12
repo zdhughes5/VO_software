@@ -33,7 +33,9 @@ from astropy.time import Time
 import star_field
 from db_worker_process import parse_vdb_timestamp
 
-# Same site as Realtime_GUI.database_worker.
+# veritas_db.database_worker's fallback site. The live overlay places each
+# telescope at its own GPS position (star_field.load_telescope_locations); the
+# geometry checks below use this single site, which differs by <= 0.004 deg.
 BASECAMP = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
 
 # ref/ is gitignored, so this may legitimately be absent.
@@ -117,7 +119,7 @@ def verify_camera_transform(n=400, seed=0):
         x, y = star_field.altaz_to_camera(alt, az, star.alt.degree, star.az.degree)
 
         worst = max(worst,
-                    abs(float(x) - ref_daz.degree),
+                    abs(float(x) - star_field.CAMERA_X_SIGN * ref_daz.degree),
                     abs(float(y) - star_field.CAMERA_Y_SIGN * ref_dalt.degree))
 
     print(f'      {n} random pointings, max |port - astropy| = {worst:.3e} deg')
@@ -126,7 +128,11 @@ def verify_camera_transform(n=400, seed=0):
 
     assert worst < 2e-3, f'camera transform disagrees with astropy by {worst:.3e} deg'
     assert star_field.CAMERA_Y_SIGN == -1.0, 'CAMERA_Y_SIGN must be -1 for the VERITAS camera frame'
-    print('PASS  altaz_to_camera matches (+delta_az, -delta_alt)')
+    assert star_field.CAMERA_X_SIGN in (-1.0, 1.0), 'CAMERA_X_SIGN must be +1 or -1'
+    xs = '+' if star_field.CAMERA_X_SIGN > 0 else '-'
+    print(f'PASS  altaz_to_camera matches ({xs}delta_az, -delta_alt)')
+    if star_field.CAMERA_X_SIGN < 0:
+        print('      NOTE  CAMERA_X_SIGN = -1: star x is mirrored from Eventdisplay\'s convention')
     return worst
 
 
@@ -168,6 +174,29 @@ def verify_catalog():
     # Pinning a scheme must leave stars lacking it unlabelled.
     assert catalog.label(int(anon[0]), 'proper_name') == ''
     print('PASS  catalog loads; identifiers and label schemes resolve')
+
+
+def verify_telescope_locations():
+    """The GPS survey file must give four sensible, distinct telescope sites."""
+    locations, missing = star_field.load_telescope_locations(fallback=BASECAMP)
+    assert not missing, f'no GPS position for {missing} in {star_field.TELESCOPE_POSITIONS_FILE}'
+
+    def ground_m(a, b):
+        da = [(p - q).to_value(u.m) for p, q in zip(a.to_geocentric(), b.to_geocentric())]
+        return float(np.linalg.norm(da))
+
+    for t, loc in locations.items():
+        d = ground_m(loc, BASECAMP)
+        print(f'      {t}: lat {loc.lat.degree:.7f}  lon {loc.lon.degree:.7f}  '
+              f'h {loc.height.to_value(u.m):.1f} m   {d:.0f} m from basecamp')
+        assert d < 500, f'{t} is {d:.0f} m from basecamp -- wrong file or a typo?'
+
+    names = list(locations)
+    spacings = [ground_m(locations[a], locations[b])
+                for i, a in enumerate(names) for b in names[i + 1:]]
+    print(f'      telescope spacing {min(spacings):.0f}-{max(spacings):.0f} m')
+    assert all(50 < s < 200 for s in spacings), f'unexpected spacing {spacings}'
+    print('PASS  four telescope GPS positions load and are laid out as an array')
 
 
 def verify_timestamp_parsing():
@@ -235,8 +264,10 @@ def self_test():
     before = [r for r in rows if r[0] < 0]
     after = [r for r in rows if r[0] > 0]
 
-    assert all(r[3] < -0.9 for r in before), 'companion should sit at x ~ -1 before transit'
-    assert all(r[3] > +0.9 for r in after), 'companion should sit at x ~ +1 after transit'
+    # In Eventdisplay's frame the companion goes -1 -> +1; CAMERA_X_SIGN mirrors that.
+    s = star_field.CAMERA_X_SIGN
+    assert all(s * r[3] < -0.9 for r in before), f'companion should sit at x ~ {-s:+.0f} before transit'
+    assert all(s * r[3] > +0.9 for r in after), f'companion should sit at x ~ {s:+.0f} after transit'
     assert all(abs(r[4]) < 0.15 for r in rows), 'companion should stay near y ~ 0'
     print('PASS  companion crosses the camera through transit (field rotation works)')
 
@@ -309,6 +340,7 @@ def main():
         verify_pixel_layout()
         verify_camera_transform()
         verify_catalog()
+        verify_telescope_locations()
         verify_timestamp_parsing()
         return 0
 

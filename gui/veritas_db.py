@@ -40,6 +40,13 @@ class database_worker(QtCore.QObject):
         self.running = False
         self.basecamp = EarthLocation(lat=31.6716989799*u.deg, lon=-110.951291195*u.deg, height=1268*u.m)
         self.observer = apl.Observer(location=self.basecamp, name="VERITAS")
+        # Each telescope's own GPS position; basecamp only where one is missing.
+        self.telescope_locations, missing = star_field.load_telescope_locations(fallback=self.basecamp)
+        if missing:
+            logger.log(logging.WARNING,
+                       f"No GPS position for {', '.join(missing)} in {star_field.TELESCOPE_POSITIONS_FILE}; "
+                       "using the basecamp site for those (a <0.004 deg effect on stars).",
+                       extra={'qThreadName': QtCore.QThread.currentThread().objectName()})
         self.catalog = star_field.load_star_catalog()
         self.star_display = dict(DEFAULT_STAR_DISPLAY)
         self.queue_check_counter = 0
@@ -203,9 +210,11 @@ class database_worker(QtCore.QObject):
         for telescope in ['t1', 't2', 't3', 't4']:
             row = vpm[telescope]
             obstime = self.pointing_obstime(telescope, row)
+            # *_meas, never *_raw: the raw encoder values were up to 6 deg off
+            # the source. See docs/2026-11-11-star-overlay-pointing.md.
             current_pointing = SkyCoord(
-                alt=row['elevation_raw']*u.rad, az=row['azimuth_raw']*u.rad,
-                location=self.basecamp, obstime=obstime, frame='altaz',
+                alt=row['elevation_meas']*u.rad, az=row['azimuth_meas']*u.rad,
+                location=self.telescope_locations[telescope], obstime=obstime, frame='altaz',
             )
             # Camera coordinates, not raw alt/az offsets: the elevation axis is
             # flipped in the VERITAS camera frame. See star_field.py.

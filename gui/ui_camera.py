@@ -62,10 +62,16 @@ class CameraDisplayMixin:
         #self.nPts = 255
         self.nPts = 255
         self.ptr1 = -1000
-        self.pixelMax = 66000
+        # Colour map range for the camera pixels. Raw values span 0-~65000, but
+        # in practice the baseline is ~100 and stars peak near ~120, so a narrow
+        # window makes stars visible. Values below pixelMin draw in the lowest
+        # colour and values above pixelMax in the highest. Change these two
+        # numbers to adjust the range. (Was 0-66000.)
+        self.pixelMin = 90
+        self.pixelMax = 130
         self.colormap = pg.colormap.get('CET-CBL2')
-        self.valueRange = np.linspace(0, self.pixelMax, num=self.nPts)
-        self.valueRangeLog = np.logspace(0, np.log10(self.pixelMax), num=self.nPts)
+        self.valueRange = np.linspace(self.pixelMin, self.pixelMax, num=self.nPts)
+        self.valueRangeLog = np.logspace(np.log10(self.pixelMin), np.log10(self.pixelMax), num=self.nPts)
         np.insert(self.valueRangeLog, 0, 0.0)
         #self.valueRange = np.linspace(0, 5000, num=self.nPts)
         self.colors = self.colormap.getLookupTable(0, 1, nPts=self.nPts+1)

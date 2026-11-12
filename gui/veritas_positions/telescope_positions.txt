@@ -1,0 +1,17 @@
+# VERITAS telescope GPS positions
+#
+# Transcribed from phone GPS screenshots in this directory
+# (T1_20261111-171539.png ... T4_20261111-171040.png), taken 2026-11-11 local
+# (MST), which is 2026-11-12 UTC.
+#
+# Datum: WGS84 (phone GNSS). Altitude is MSL as reported by the phone.
+# Longitude is West, so decimal longitude is negative.
+# Precision: the display shows 0.1 arcsec, about 3.1 m in latitude and
+# 2.6 m in longitude. The phone reported 3 to 3.1 m horizontal error.
+# Phone altitude is much less accurate than the horizontal position.
+#
+# tel  lat_dms           lon_dms             lat_deg      lon_deg        alt_m   err_m  hdop  vdop  fix_utc
+T1     31:40:29.40N      110:57:03.50W       31.6748333   -110.9509722   1276.3  3.0    0.5   0.7   00:15:38
+T2     31:40:28.20N      110:57:07.00W       31.6745000   -110.9519444   1267.5  3.0    0.5   0.6   00:07:04
+T3     31:40:31.70N      110:57:07.50W       31.6754722   -110.9520833   1272.7  3.1    0.5   0.6   00:11:56
+T4     31:40:30.10N      110:57:10.00W       31.6750278   -110.9527778   1269.9  3.0    0.5   0.6   00:10:39
